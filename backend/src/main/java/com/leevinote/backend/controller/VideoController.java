@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/videos")
+@RequestMapping("/videos")
 @RequiredArgsConstructor
 public class VideoController {
     private final VideoService videoService;
@@ -21,7 +21,9 @@ public class VideoController {
 
     @PostMapping
     public ResponseEntity<Video> createVideo(@RequestBody Video video) {
-        video.setUser(new com.leevinote.backend.entity.User() {{ setId(1L); }});
+        com.leevinote.backend.entity.User user = new com.leevinote.backend.entity.User();
+        user.setId(1L);
+        video.setUser(user);
         return ResponseEntity.ok(videoService.createVideo(video));
     }
 

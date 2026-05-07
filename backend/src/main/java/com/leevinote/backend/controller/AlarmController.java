@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/alarms")
+@RequestMapping("/alarms")
 @RequiredArgsConstructor
 public class AlarmController {
     private final AlarmService alarmService;
@@ -21,7 +21,9 @@ public class AlarmController {
 
     @PostMapping
     public ResponseEntity<Alarm> createAlarm(@RequestBody Alarm alarm) {
-        alarm.setUser(new com.leevinote.backend.entity.User() {{ setId(1L); }});
+        com.leevinote.backend.entity.User user = new com.leevinote.backend.entity.User();
+        user.setId(1L);
+        alarm.setUser(user);
         return ResponseEntity.ok(alarmService.createAlarm(alarm));
     }
 

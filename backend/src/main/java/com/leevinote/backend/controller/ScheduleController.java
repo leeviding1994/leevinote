@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/schedules")
+@RequestMapping("/schedules")
 @RequiredArgsConstructor
 public class ScheduleController {
     private final ScheduleService scheduleService;
@@ -22,7 +22,9 @@ public class ScheduleController {
 
     @PostMapping
     public ResponseEntity<Schedule> createSchedule(@RequestBody Schedule schedule) {
-        schedule.setUser(new com.leevinote.backend.entity.User() {{ setId(1L); }});
+        com.leevinote.backend.entity.User user = new com.leevinote.backend.entity.User();
+        user.setId(1L);
+        schedule.setUser(user);
         return ResponseEntity.ok(scheduleService.createSchedule(schedule));
     }
 

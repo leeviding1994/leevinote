@@ -8,10 +8,10 @@ spring:
     name: leevinote-backend
 
   datasource:
-    url: jdbc:h2:mem:leevinote;MODE=PostgreSQL
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
+    url: jdbc:postgresql://localhost:5432/leevinote
+    username: leevinote
+    password: leevinote123
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
@@ -19,7 +19,7 @@ spring:
     show-sql: true
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
   data:
@@ -34,7 +34,7 @@ spring:
     default-property-inclusion: NON_NULL
 
 jwt:
-  secret: leevinote-secret-key-2024-very-long-secret-key-for-jwt-token
+  secret: leevinote-secret-key-2024-very-long-secret-key-for-jwt-token-which-must-be-at-least-64-bytes-long
   expiration: 86400
 
 logging:

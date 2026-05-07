@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/notes")
+@RequestMapping("/notes")
 @RequiredArgsConstructor
 public class NoteController {
     private final NoteService noteService;
@@ -22,7 +22,9 @@ public class NoteController {
 
     @PostMapping
     public ResponseEntity<Note> createNote(@RequestBody Note note) {
-        note.setUser(new com.leevinote.backend.entity.User() {{ setId(getCurrentUserId()); }});
+        com.leevinote.backend.entity.User user = new com.leevinote.backend.entity.User();
+        user.setId(getCurrentUserId());
+        note.setUser(user);
         return ResponseEntity.ok(noteService.createNote(note));
     }
 

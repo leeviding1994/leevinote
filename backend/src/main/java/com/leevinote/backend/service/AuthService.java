@@ -39,7 +39,11 @@ public class AuthService {
         user.setEmail(request.getEmail());
 
         Role userRole = roleRepository.findByName("ROLE_USER")
-                .orElseGet(() -> roleRepository.save(new Role() {{ setName("ROLE_USER"); }}));
+                .orElseGet(() -> {
+                    Role newRole = new Role();
+                    newRole.setName("ROLE_USER");
+                    return roleRepository.save(newRole);
+                });
         Set<Role> roles = new HashSet<>();
         roles.add(userRole);
         user.setRoles(roles);

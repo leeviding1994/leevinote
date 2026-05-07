@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/music")
+@RequestMapping("/music")
 @RequiredArgsConstructor
 public class MusicController {
     private final MusicService musicService;
@@ -21,7 +21,9 @@ public class MusicController {
 
     @PostMapping
     public ResponseEntity<Music> createMusic(@RequestBody Music music) {
-        music.setUser(new com.leevinote.backend.entity.User() {{ setId(1L); }});
+        com.leevinote.backend.entity.User user = new com.leevinote.backend.entity.User();
+        user.setId(1L);
+        music.setUser(user);
         return ResponseEntity.ok(musicService.createMusic(music));
     }
 
