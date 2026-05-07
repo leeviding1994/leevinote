@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: leevinote-postgres
+    environment:
+      POSTGRES_DB: leevinote
+      POSTGRES_USER: leevinote
+      POSTGRES_PASSWORD: leevinote123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: leevinote-redis
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: .
+    container_name: leevinote-backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/leevinote
+      SPRING_REDIS_HOST: redis
+
+volumes:
+  postgres_data:

@@ -1,0 +1,43 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: leevinote-backend
+
+  datasource:
+    url: jdbc:h2:mem:leevinote;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      database: 0
+
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: NON_NULL
+
+jwt:
+  secret: leevinote-secret-key-2024-very-long-secret-key-for-jwt-token
+  expiration: 86400
+
+logging:
+  level:
+    com.leevinote: DEBUG
+    org.springframework.security: INFO
