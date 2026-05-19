@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/music")
@@ -30,6 +31,6 @@ public class MusicController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteMusic(@PathVariable Long id) {
         musicService.deleteMusic(id);
-        return ResponseEntity.ok("Music deleted");
+        return ResponseEntity.ok(Map.of("message", "Music deleted"));
     }
 }

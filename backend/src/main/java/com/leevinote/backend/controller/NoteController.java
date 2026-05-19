@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/notes")
@@ -31,7 +32,7 @@ public class NoteController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteNote(@PathVariable Long id) {
         noteService.deleteNote(id);
-        return ResponseEntity.ok("Note deleted");
+        return ResponseEntity.ok(Map.of("message", "Note deleted"));
     }
 
     private Long getCurrentUserId() {

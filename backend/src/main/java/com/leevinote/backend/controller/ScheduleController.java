@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -38,6 +39,6 @@ public class ScheduleController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteSchedule(@PathVariable Long id) {
         scheduleService.deleteSchedule(id);
-        return ResponseEntity.ok("Schedule deleted");
+        return ResponseEntity.ok(Map.of("message", "Schedule deleted"));
     }
 }

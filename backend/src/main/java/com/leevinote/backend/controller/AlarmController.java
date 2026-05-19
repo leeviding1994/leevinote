@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/alarms")
@@ -30,6 +31,6 @@ public class AlarmController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteAlarm(@PathVariable Long id) {
         alarmService.deleteAlarm(id);
-        return ResponseEntity.ok("Alarm deleted");
+        return ResponseEntity.ok(Map.of("message", "Alarm deleted"));
     }
 }

@@ -106,24 +106,27 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleSubmit() async {
     setState(() => _isLoading = true);
     final auth = context.read<AuthService>();
-    bool success;
-    if (_isLogin) {
-      success = await auth.login(
-        _usernameController.text,
-        _passwordController.text,
-      );
-    } else {
-      success = await auth.signup(
-        _usernameController.text,
-        _passwordController.text,
-        _emailController.text.isEmpty ? null : _emailController.text,
-      );
-    }
-    setState(() => _isLoading = false);
-    if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_isLogin ? '登录失败' : '注册失败')),
-      );
+    try {
+      if (_isLogin) {
+        await auth.login(
+          _usernameController.text,
+          _passwordController.text,
+        );
+      } else {
+        await auth.signup(
+          _usernameController.text,
+          _passwordController.text,
+          _emailController.text.isEmpty ? null : _emailController.text,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 

@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:leevinote/utils/constants.dart';
 
 class ApiService {
   late Dio _dio;
-  final _storage = const FlutterSecureStorage();
 
   ApiService() {
     _dio = Dio(BaseOptions(
@@ -20,19 +21,38 @@ class ApiService {
 
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await _storage.read(key: 'jwt_token');
+        final token = await _readToken();
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
         handler.next(options);
       },
-      onError: (error, handler) {
+      onError: (error, handler) async {
         if (error.response?.statusCode == 401) {
-          _storage.delete(key: 'jwt_token');
+          await _deleteToken();
         }
         handler.next(error);
       },
     ));
+  }
+
+  Future<String?> _readToken() async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('jwt_token');
+    }
+    const storage = FlutterSecureStorage();
+    return storage.read(key: 'jwt_token');
+  }
+
+  Future<void> _deleteToken() async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('jwt_token');
+    } else {
+      const storage = FlutterSecureStorage();
+      await storage.delete(key: 'jwt_token');
+    }
   }
 
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> data) async {

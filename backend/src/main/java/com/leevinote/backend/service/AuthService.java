@@ -49,7 +49,7 @@ public class AuthService {
         user.setRoles(roles);
 
         userRepository.save(user);
-        return "User registered successfully";
+        return null;
     }
 
     public String login(LoginRequest request) {

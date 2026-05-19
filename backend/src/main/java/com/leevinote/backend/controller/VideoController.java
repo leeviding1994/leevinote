@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/videos")
@@ -30,6 +31,6 @@ public class VideoController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteVideo(@PathVariable Long id) {
         videoService.deleteVideo(id);
-        return ResponseEntity.ok("Video deleted");
+        return ResponseEntity.ok(Map.of("message", "Video deleted"));
     }
 }
