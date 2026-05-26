@@ -17,7 +17,7 @@ class Alarm {
 
   factory Alarm.fromJson(Map<String, dynamic> json) {
     return Alarm(
-      id: json['id'],
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
       title: json['title'],
       description: json['description'],
       alarmTime: DateTime.parse(json['alarm_time']),

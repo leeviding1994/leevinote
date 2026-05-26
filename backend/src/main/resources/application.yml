@@ -29,9 +29,19 @@ spring:
       password:
       database: 0
 
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+
   jackson:
     property-naming-strategy: SNAKE_CASE
     default-property-inclusion: NON_NULL
+
+app:
+  upload:
+    dir: ${user.home}/leevinote/uploads
 
 jwt:
   secret: leevinote-secret-key-2024-very-long-secret-key-for-jwt-token-which-must-be-at-least-64-bytes-long

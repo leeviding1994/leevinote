@@ -28,7 +28,7 @@ class ApiService {
         handler.next(options);
       },
       onError: (error, handler) async {
-        if (error.response?.statusCode == 401) {
+        if (error.response?.statusCode == 401 || error.response?.statusCode == 403) {
           await _deleteToken();
         }
         handler.next(error);
@@ -64,9 +64,51 @@ class ApiService {
     }
   }
 
+  Future<List<dynamic>> getList(String path) async {
+    try {
+      final response = await _dio.get(path);
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Future<Map<String, dynamic>> get(String path) async {
     try {
       final response = await _dio.get(path);
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> uploadFile(String path, String filePath) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath),
+      });
+      final response = await _dio.post(path, data: formData);
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> uploadBytes(String path, Uint8List bytes, String filename) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+      });
+      final response = await _dio.post(path, data: formData);
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> put(String path, Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.put(path, data: jsonEncode(data));
       return response.data;
     } on DioException catch (e) {
       throw _handleError(e);
@@ -84,7 +126,25 @@ class ApiService {
 
   String _handleError(DioException e) {
     if (e.response != null) {
-      return e.response?.data['message'] ?? 'Request failed';
+      final data = e.response?.data;
+      final statusCode = e.response?.statusCode;
+
+      if (data is Map) {
+        final msg = data['message'];
+        if (msg != null && msg.toString().isNotEmpty) {
+          return msg.toString();
+        }
+        final error = data['error'];
+        if (error != null && error.toString().isNotEmpty) {
+          return error.toString();
+        }
+      } else {
+        final str = data?.toString();
+        if (str != null && str.isNotEmpty) {
+          return str;
+        }
+      }
+      return statusCode != null ? 'Request failed ($statusCode)' : 'Request failed';
     }
     return e.message ?? 'Network error';
   }

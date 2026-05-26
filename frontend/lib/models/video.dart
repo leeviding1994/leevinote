@@ -15,11 +15,11 @@ class Video {
 
   factory Video.fromJson(Map<String, dynamic> json) {
     return Video(
-      id: json['id'],
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
       title: json['title'],
       description: json['description'],
       fileUrl: json['file_url'],
-      duration: json['duration'],
+      duration: json['duration'] is int ? json['duration'] : int.tryParse(json['duration']?.toString() ?? ''),
     );
   }
 

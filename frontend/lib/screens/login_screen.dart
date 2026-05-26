@@ -119,6 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
           _emailController.text.isEmpty ? null : _emailController.text,
         );
       }
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1,6 +1,8 @@
 package com.leevinote.backend.controller;
 
 import com.leevinote.backend.entity.Note;
+import com.leevinote.backend.entity.User;
+import com.leevinote.backend.repository.UserRepository;
 import com.leevinote.backend.service.NoteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +16,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class NoteController {
     private final NoteService noteService;
+    private final UserRepository userRepository;
 
     @GetMapping
     public ResponseEntity<List<Note>> getNotes() {
@@ -23,10 +26,15 @@ public class NoteController {
 
     @PostMapping
     public ResponseEntity<Note> createNote(@RequestBody Note note) {
-        com.leevinote.backend.entity.User user = new com.leevinote.backend.entity.User();
+        User user = new User();
         user.setId(getCurrentUserId());
         note.setUser(user);
         return ResponseEntity.ok(noteService.createNote(note));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Note> updateNote(@PathVariable Long id, @RequestBody Note note) {
+        return ResponseEntity.ok(noteService.updateNote(id, note));
     }
 
     @DeleteMapping("/{id}")
@@ -37,6 +45,8 @@ public class NoteController {
 
     private Long getCurrentUserId() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return 1L; // TODO: 从数据库查询用户ID
+        return userRepository.findByUsername(username)
+            .orElseThrow(() -> new RuntimeException("User not found: " + username))
+            .getId();
     }
 }

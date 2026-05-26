@@ -16,14 +16,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
-
-  final List<Widget> _screens = [
-    const NotesScreen(),
-    const AlarmsScreen(),
-    const MusicScreen(),
-    const VideosScreen(),
-    const SchedulesScreen(),
-  ];
+  final _notesKey = GlobalKey<NotesScreenState>();
 
   final List<String> _titles = [
     '笔记',
@@ -35,19 +28,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthService>();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_currentIndex]),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              context.read<AuthService>().logout();
-            },
-          ),
+          if (_currentIndex == 0)
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+              onPressed: () => _notesKey.currentState?.sync(),
+            ),
         ],
       ),
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          NotesScreen(key: _notesKey),
+          const AlarmsScreen(),
+          const MusicScreen(),
+          const VideosScreen(),
+          const SchedulesScreen(),
+        ],
+      ),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton(
+              onPressed: () => _notesKey.currentState?.openEditor(null),
+              child: const Icon(Icons.add),
+            )
+          : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {

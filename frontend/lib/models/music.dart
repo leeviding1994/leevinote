@@ -17,12 +17,12 @@ class Music {
 
   factory Music.fromJson(Map<String, dynamic> json) {
     return Music(
-      id: json['id'],
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
       title: json['title'],
       artist: json['artist'],
       album: json['album'],
       fileUrl: json['file_url'],
-      duration: json['duration'],
+      duration: json['duration'] is int ? json['duration'] : int.tryParse(json['duration']?.toString() ?? ''),
     );
   }
 

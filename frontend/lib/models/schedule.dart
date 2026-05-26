@@ -17,7 +17,7 @@ class Schedule {
 
   factory Schedule.fromJson(Map<String, dynamic> json) {
     return Schedule(
-      id: json['id'],
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
       title: json['title'],
       description: json['description'],
       startTime: DateTime.parse(json['start_time']),
