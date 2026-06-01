@@ -25,6 +25,7 @@ public class NoteService {
         note.setTitle(updated.getTitle());
         note.setContent(updated.getContent());
         note.setCategory(updated.getCategory());
+        note.setFolderId(updated.getFolderId());
         return noteRepository.save(note);
     }
 

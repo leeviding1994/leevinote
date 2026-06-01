@@ -2,24 +2,20 @@ import 'package:uuid/uuid.dart';
 
 const _uuid = Uuid();
 
-class Note {
+class Folder {
   final int? id;
   final String localId;
-  final String title;
-  final String? content;
-  final String? category;
-  final int? folderId;
+  final String name;
+  final int? parentId;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final String syncStatus; // local, synced, modified, deleted
+  final String syncStatus;
 
-  Note({
+  Folder({
     this.id,
     String? localId,
-    required this.title,
-    this.content,
-    this.category,
-    this.folderId,
+    required this.name,
+    this.parentId,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.syncStatus = 'local',
@@ -27,39 +23,32 @@ class Note {
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
-  Note copyWith({
+  Folder copyWith({
     int? id,
     String? localId,
-    String? title,
-    String? content,
-    String? category,
-    int? Function()? folderId,
+    String? name,
+    int? Function()? parentId,
     DateTime? updatedAt,
     String? syncStatus,
   }) {
-    return Note(
+    return Folder(
       id: id ?? this.id,
       localId: localId ?? this.localId,
-      title: title ?? this.title,
-      content: content ?? this.content,
-      category: category ?? this.category,
-      folderId: folderId != null ? folderId() : this.folderId,
-      createdAt: createdAt,
+      name: name ?? this.name,
+      parentId: parentId != null ? parentId() : this.parentId,
       updatedAt: updatedAt ?? DateTime.now(),
       syncStatus: syncStatus ?? this.syncStatus,
     );
   }
 
-  factory Note.fromJson(Map<String, dynamic> json) {
-    return Note(
+  factory Folder.fromJson(Map<String, dynamic> json) {
+    return Folder(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
       localId: json['local_id'] ?? const Uuid().v4(),
-      title: json['title'] ?? '',
-      content: json['content'],
-      category: json['category'],
-      folderId: json['folder_id'] is int
-          ? json['folder_id']
-          : int.tryParse(json['folder_id']?.toString() ?? ''),
+      name: json['name'] ?? '',
+      parentId: json['parent_id'] is int
+          ? json['parent_id']
+          : int.tryParse(json['parent_id']?.toString() ?? ''),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -74,10 +63,8 @@ class Note {
     return {
       if (id != null) 'id': id,
       'local_id': localId,
-      'title': title,
-      'content': content,
-      'category': category,
-      'folder_id': folderId,
+      'name': name,
+      'parent_id': parentId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'sync_status': syncStatus,
@@ -87,10 +74,8 @@ class Note {
   Map<String, dynamic> toRemoteJson() {
     return {
       if (id != null) 'id': id,
-      'title': title,
-      'content': content,
-      'category': category,
-      'folder_id': folderId,
+      'name': name,
+      'parent_id': parentId,
     };
   }
 }

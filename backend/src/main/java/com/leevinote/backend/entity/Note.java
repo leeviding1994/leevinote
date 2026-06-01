@@ -18,6 +18,9 @@ public class Note extends BaseEntity {
 
     private String category;
 
+    @Column(name = "folder_id")
+    private Long folderId;
+
     @JsonIgnore
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)

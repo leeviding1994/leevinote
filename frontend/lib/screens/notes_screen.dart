@@ -2,19 +2,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:leevinote/models/note.dart';
+import 'package:leevinote/models/folder.dart';
 import 'package:leevinote/services/api_service.dart';
 import 'package:leevinote/services/auth_service.dart';
 import 'package:leevinote/services/local_note_service.dart';
+import 'package:leevinote/services/local_folder_service.dart';
 import 'package:leevinote/utils/constants.dart';
 import 'package:leevinote/screens/note_editor_screen.dart';
 import 'package:leevinote/screens/login_screen.dart';
-
-class _FolderNode {
-  final String name;
-  final String path;
-  final List<_FolderNode> children;
-  _FolderNode(this.name, this.path, this.children);
-}
 
 class NotesScreen extends StatefulWidget {
   const NotesScreen({super.key});
@@ -25,128 +20,16 @@ class NotesScreen extends StatefulWidget {
 
 class NotesScreenState extends State<NotesScreen> {
   final _searchC = TextEditingController();
-  String? _selectedCategory;
+  int? _selectedFolderId;
   bool _selectionMode = false;
   final Set<String> _selectedIds = {};
-
-  List<_FolderNode> _buildFolderTree(List<String> folders) {
-    final root = <String, _FolderNode>{};
-
-    for (final folder in folders) {
-      final parts = folder.split('/');
-      String currentPath = '';
-
-      for (int i = 0; i < parts.length; i++) {
-        final part = parts[i];
-        currentPath = currentPath.isEmpty ? part : '$currentPath/$part';
-
-        if (i == 0) {
-          root.putIfAbsent(part, () => _FolderNode(part, currentPath, []));
-        } else {
-          final parentPath = parts.sublist(0, i).join('/');
-          final parentNode = _findNode(root.values.toList(), parentPath);
-          if (parentNode != null && !parentNode.children.any((c) => c.name == part)) {
-            parentNode.children.add(_FolderNode(part, currentPath, []));
-          }
-        }
-      }
-    }
-
-    final result = root.values.toList();
-    _sortTreeInPlace(result);
-    return result;
-  }
-
-  _FolderNode? _findNode(List<_FolderNode> nodes, String path) {
-    for (final node in nodes) {
-      if (node.path == path) return node;
-      final found = _findNode(node.children, path);
-      if (found != null) return found;
-    }
-    return null;
-  }
-
-  void _sortTreeInPlace(List<_FolderNode> nodes) {
-    nodes.sort((a, b) => a.name.compareTo(b.name));
-    for (final node in nodes) {
-      if (node.children.isNotEmpty) {
-        _sortTreeInPlace(node.children);
-      }
-    }
-  }
-
-  Widget _buildNodeWidget(_FolderNode node, Function(String) onSelect, String? selectedPath) {
-    if (node.children.isEmpty) {
-      return ListTile(
-        dense: true,
-        leading: const Icon(Icons.folder, size: 20),
-        title: Text(node.name),
-        selected: selectedPath == node.path,
-        onTap: () => onSelect(node.path),
-      );
-    }
-    return ExpansionTile(
-      leading: const Icon(Icons.folder, size: 20),
-      title: Text(node.name),
-      children: node.children.map((child) => _buildNodeWidget(child, onSelect, selectedPath)).toList(),
-    );
-  }
-
-  void _showFolderPicker(BuildContext context, Function(String?) onSelect) {
-    final cats = _categories;
-    if (cats.isEmpty) {
-      onSelect(null);
-      return;
-    }
-
-    final tree = _buildFolderTree(cats);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('选择文件夹'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.folder_special, size: 20),
-                  title: const Text('全部文件夹'),
-                  onTap: () {
-                    final callback = onSelect;
-                    Navigator.pop(ctx);
-                    callback(null);
-                  },
-                ),
-                const Divider(),
-                ...tree.map((node) => _buildNodeWidget(node, (path) {
-                  final callback = onSelect;
-                  Navigator.pop(ctx);
-                  callback(path);
-                }, _selectedCategory)),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<LocalNoteService>().ensureLoaded();
+      context.read<LocalFolderService>().ensureLoaded();
     });
   }
 
@@ -186,11 +69,12 @@ class NotesScreenState extends State<NotesScreen> {
   }
 
   List<Note> get _notes => context.watch<LocalNoteService>().notes;
+  List<Folder> get _folders => context.watch<LocalFolderService>().folders;
 
   List<Note> get _filteredNotes {
     return _notes.where((n) {
       if (n.syncStatus == 'deleted') return false;
-      if (_selectedCategory != null && n.category != _selectedCategory) return false;
+      if (_selectedFolderId != null && n.folderId != _selectedFolderId) return false;
       if (_searchC.text.isNotEmpty) {
         final q = _searchC.text.toLowerCase();
         final matchTitle = n.title.toLowerCase().contains(q);
@@ -201,14 +85,16 @@ class NotesScreenState extends State<NotesScreen> {
     }).toList();
   }
 
-  List<String> get _categories {
-    return _notes
-        .map((n) => n.category)
-        .where((c) => c != null && c.isNotEmpty)
-        .cast<String>()
-        .toSet()
-        .toList()
-      ..sort();
+  List<Folder> get _rootFolders =>
+      _folders.where((f) => f.parentId == null).toList()..sort((a, b) => a.name.compareTo(b.name));
+
+  List<Folder> childFolders(int? parentId) =>
+      _folders.where((f) => f.parentId == parentId).toList()..sort((a, b) => a.name.compareTo(b.name));
+
+  String _folderName(int? folderId) {
+    if (folderId == null) return '';
+    final folder = _folders.where((f) => f.id == folderId || f.localId == _folders.where((f2) => f2.id == folderId).firstOrNull?.localId).firstOrNull;
+    return folder?.name ?? '';
   }
 
   Future<void> sync() async {
@@ -223,12 +109,13 @@ class NotesScreenState extends State<NotesScreen> {
 
     final api = context.read<ApiService>();
     final local = context.read<LocalNoteService>();
+    final folderService = context.read<LocalFolderService>();
 
     try {
       await local.ensureLoaded();
+      await folderService.ensureLoaded();
       final localNotes = local.notes;
 
-      // Push local changes
       for (final note in List.from(localNotes)) {
         if (note.syncStatus == 'local' && note.id == null) {
           final resp = await api.post(ApiConstants.notes, note.toRemoteJson());
@@ -249,11 +136,17 @@ class NotesScreenState extends State<NotesScreen> {
         }
       }
 
-      // Pull remote notes
       final remoteData = await api.getList(ApiConstants.notes);
       for (final e in remoteData) {
         final remote = Note.fromJson(e as Map<String, dynamic>).copyWith(syncStatus: 'synced');
         await local.addOrUpdateFromRemote(remote);
+      }
+
+      // Sync folders
+      final remoteFolders = await api.getList(ApiConstants.folders);
+      for (final e in remoteFolders) {
+        final remote = Folder.fromJson(e as Map<String, dynamic>);
+        await folderService.addOrUpdateFromRemote(remote.copyWith(syncStatus: 'synced'));
       }
 
       if (mounted) {
@@ -279,7 +172,7 @@ class NotesScreenState extends State<NotesScreen> {
           SnackBar(content: Text('同步失败: $e')),
         );
       }
-    } finally {}
+    }
   }
 
   Future<void> openEditor(Note? note) async {
@@ -302,6 +195,145 @@ class NotesScreenState extends State<NotesScreen> {
     }
   }
 
+  List<Widget> _buildFolderTreeWidget(List<Folder> folders, Function(int) onSelect) {
+    if (folders.isEmpty) return [];
+    return folders.map((folder) {
+      final children = childFolders(folder.id);
+      if (children.isEmpty) {
+        return ListTile(
+          dense: true,
+          leading: const Icon(Icons.folder, size: 20),
+          title: Text(folder.name),
+          selected: _selectedFolderId == folder.id,
+          trailing: IconButton(
+            icon: const Icon(Icons.delete_outline, size: 18),
+            onPressed: () => _deleteFolder(folder),
+          ),
+          onTap: () => onSelect(folder.id!),
+        );
+      }
+      return ExpansionTile(
+        leading: const Icon(Icons.folder, size: 20),
+        title: Text(folder.name),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete_outline, size: 18),
+          onPressed: () => _deleteFolder(folder),
+        ),
+        children: [
+          ..._buildFolderTreeWidget(children, onSelect),
+          ListTile(
+              dense: true,
+              leading: const Icon(Icons.folder, size: 20),
+              title: Text(folder.name),
+              selected: _selectedFolderId == folder.id,
+              onTap: () => onSelect(folder.id!),
+            ),
+          ],
+        );
+      }).toList();
+  }
+
+  void _deleteFolder(Folder folder) async {
+    final folderService = context.read<LocalFolderService>();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除文件夹'),
+        content: Text('确定要删除文件夹"${folder.name}"吗？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定')),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await folderService.deleteFolder(folder.localId);
+      if (_selectedFolderId == folder.id) {
+        setState(() => _selectedFolderId = null);
+      }
+    }
+  }
+
+  void _addSubFolder(Folder? parent) async {
+    final nameC = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(parent == null ? '新建文件夹' : '在"${parent.name}"下新建'),
+        content: TextField(
+          controller: nameC,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '文件夹名称'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, nameC.text.trim()), child: const Text('确定')),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty) {
+      final folderService = context.read<LocalFolderService>();
+      await folderService.addFolder(Folder(
+        name: result,
+        parentId: parent?.id,
+      ));
+    }
+  }
+
+  void _showFolderPicker() {
+    if (_folders.isEmpty) {
+      _addSubFolder(null);
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('选择文件夹'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.folder_special, size: 20),
+                  title: const Text('全部文件夹'),
+                  selected: _selectedFolderId == null,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() => _selectedFolderId = null);
+                  },
+                ),
+                const Divider(),
+                ..._buildFolderTreeWidget(_rootFolders, (folderId) {
+                  Navigator.pop(ctx);
+                  setState(() => _selectedFolderId = folderId);
+                }),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _addSubFolder(null);
+            },
+            icon: const Icon(Icons.create_new_folder, size: 18),
+            label: const Text('新建文件夹'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredNotes;
@@ -313,9 +345,7 @@ class NotesScreenState extends State<NotesScreen> {
           child: Row(
             children: [
               InkWell(
-                onTap: () => _showFolderPicker(context, (path) {
-                  setState(() => _selectedCategory = path);
-                }),
+                onTap: _showFolderPicker,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
@@ -327,7 +357,12 @@ class NotesScreenState extends State<NotesScreen> {
                     children: [
                       const Icon(Icons.folder, size: 20),
                       const SizedBox(width: 8),
-                      Text(_selectedCategory ?? '全部文件夹', style: const TextStyle(fontSize: 14)),
+                      Text(
+                        _selectedFolderId == null
+                            ? '全部文件夹'
+                            : _folderName(_selectedFolderId),
+                        style: const TextStyle(fontSize: 14),
+                      ),
                       const SizedBox(width: 4),
                       const Icon(Icons.arrow_drop_down, size: 20),
                     ],
@@ -459,8 +494,8 @@ class NotesScreenState extends State<NotesScreen> {
                                         subtitle: preview.isNotEmpty
                                             ? Text(preview, maxLines: 2, overflow: TextOverflow.ellipsis)
                                             : null,
-                                        trailing: note.category != null
-                                            ? Chip(label: Text(note.category!, style: const TextStyle(fontSize: 12)))
+                                        trailing: note.folderId != null
+                                            ? Chip(label: Text(_folderName(note.folderId), style: const TextStyle(fontSize: 12)))
                                             : null,
                                       ),
                                     ),

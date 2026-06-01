@@ -6,6 +6,7 @@ import 'package:leevinote/screens/home_screen.dart';
 import 'package:leevinote/services/auth_service.dart';
 import 'package:leevinote/services/api_service.dart';
 import 'package:leevinote/services/local_note_service.dart';
+import 'package:leevinote/services/local_folder_service.dart';
 import 'package:leevinote/utils/theme.dart';
 
 import 'dart:ui';
@@ -35,6 +36,7 @@ class LeevinoteApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthService()),
         Provider(create: (_) => ApiService()),
         ChangeNotifierProvider(create: (_) => LocalNoteService()),
+        ChangeNotifierProvider(create: (_) => LocalFolderService()),
       ],
       child: MaterialApp(
         title: 'Leevinote',

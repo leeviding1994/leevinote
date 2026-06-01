@@ -6,16 +6,11 @@ import 'package:dart_quill_delta/dart_quill_delta.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:leevinote/models/note.dart';
+import 'package:leevinote/models/folder.dart';
 import 'package:leevinote/services/api_service.dart';
 import 'package:leevinote/services/local_note_service.dart';
+import 'package:leevinote/services/local_folder_service.dart';
 import 'package:leevinote/screens/image_embed_builder.dart';
-
-class _FolderNode {
-  final String name;
-  final String path;
-  final List<_FolderNode> children;
-  _FolderNode(this.name, this.path, this.children);
-}
 
 class _MoreAction {
   final IconData icon;
@@ -36,7 +31,7 @@ class NoteEditorScreen extends StatefulWidget {
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
   String _title = '';
-  late final TextEditingController _categoryC;
+  int? _selectedFolderId;
   late final QuillController _quillC;
   final _focusNode = FocusNode();
   Timer? _saveTimer;
@@ -49,7 +44,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _currentNote = widget.note;
 
     _title = widget.note?.title ?? '';
-    _categoryC = TextEditingController(text: widget.note?.category ?? '');
+    _selectedFolderId = widget.note?.folderId;
 
     if (widget.note?.content != null && widget.note!.content!.isNotEmpty) {
       final delta = Delta.fromJson(jsonDecode(widget.note!.content!) as List);
@@ -61,7 +56,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       _quillC = QuillController.basic();
     }
 
-    _categoryC.addListener(_onChanged);
     _quillSubscription = _quillC.document.changes.listen((_) => _onChanged());
   }
 
@@ -69,8 +63,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   void dispose() {
     _saveTimer?.cancel();
     _quillSubscription?.cancel();
-    _categoryC.removeListener(_onChanged);
-    _categoryC.dispose();
     _quillC.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -88,15 +80,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final local = context.read<LocalNoteService>();
     final delta = _quillC.document.toDelta().toJson();
     final content = jsonEncode(delta);
-    final cat = _categoryC.text.trim();
 
     final existing = _currentNote;
     if (existing == null) {
-      // create new
       final note = Note(
         title: _title.trim().isEmpty ? '无标题' : _title.trim(),
         content: content,
-        category: cat.isEmpty ? null : cat,
+        folderId: _selectedFolderId,
         syncStatus: 'local',
       );
       await local.addNote(note);
@@ -105,7 +95,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       final updated = existing.copyWith(
         title: _title.trim().isEmpty ? '无标题' : _title.trim(),
         content: content,
-        category: cat.isEmpty ? null : cat,
+        folderId: _selectedFolderId != null ? () => _selectedFolderId : null,
         updatedAt: DateTime.now(),
         syncStatus: existing.syncStatus == 'synced' ? 'modified' : existing.syncStatus,
       );
@@ -247,156 +237,121 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     }
   }
 
-  List<_FolderNode> _buildFolderTree(List<String> folders) {
-    final root = <String, _FolderNode>{};
-
-    for (final folder in folders) {
-      final parts = folder.split('/');
-      String currentPath = '';
-
-      for (int i = 0; i < parts.length; i++) {
-        final part = parts[i];
-        currentPath = currentPath.isEmpty ? part : '$currentPath/$part';
-
-        if (i == 0) {
-          root.putIfAbsent(part, () => _FolderNode(part, currentPath, []));
-        } else {
-          final parentPath = parts.sublist(0, i).join('/');
-          final parentNode = _findNode(root.values.toList(), parentPath);
-          if (parentNode != null && !parentNode.children.any((c) => c.name == part)) {
-            parentNode.children.add(_FolderNode(part, currentPath, []));
-          }
-        }
-      }
-    }
-
-    final result = root.values.toList();
-    _sortTreeInPlace(result);
-    return result;
-  }
-
-  _FolderNode? _findNode(List<_FolderNode> nodes, String path) {
-    for (final node in nodes) {
-      if (node.path == path) return node;
-      final found = _findNode(node.children, path);
-      if (found != null) return found;
-    }
-    return null;
-  }
-
-  void _sortTreeInPlace(List<_FolderNode> nodes) {
-    nodes.sort((a, b) => a.name.compareTo(b.name));
-    for (final node in nodes) {
-      if (node.children.isNotEmpty) {
-        _sortTreeInPlace(node.children);
-      }
-    }
-  }
-
-  Widget _buildNodeWidget(_FolderNode node, Function(String) onSelect, String? currentPath) {
-    if (node.children.isEmpty) {
-      return ListTile(
-        dense: true,
-        leading: const Icon(Icons.folder, size: 20),
-        title: Text(node.name),
-        selected: currentPath == node.path,
-        onTap: () => onSelect(node.path),
-      );
-    }
-    return ExpansionTile(
-      leading: const Icon(Icons.folder, size: 20),
-      title: Text(node.name),
-      children: node.children.map((child) => _buildNodeWidget(child, onSelect, currentPath)).toList(),
-    );
-  }
-
   Future<void> _editCategory() async {
-    final local = context.read<LocalNoteService>();
-    await local.ensureLoaded();
-    final cats = local.notes
-        .map((n) => n.category)
-        .where((c) => c != null && c.isNotEmpty)
-        .cast<String>()
-        .toSet()
-        .toList()
-      ..sort();
-
-    final catC = TextEditingController(text: _categoryC.text);
-    final tree = _buildFolderTree(cats);
+    final folderService = context.read<LocalFolderService>();
+    await folderService.ensureLoaded();
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-            left: 16, right: 16, top: 16,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('选择或输入文件夹', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: tree.map((node) => _buildNodeWidget(node, (path) {
-                      catC.text = path;
-                      setSheetState(() {});
-                    }, catC.text)).toList(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: catC,
-                decoration: const InputDecoration(
-                  hintText: '文件夹路径',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.folder_outlined, size: 20),
-                ),
-                onChanged: (v) => setSheetState(() {}),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: TextEditingController(),
-                      decoration: InputDecoration(
-                        hintText: '输入路径创建新文件夹',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.create_new_folder_outlined, size: 20),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.add),
-                          onPressed: () {
-                            final input = catC.text.trim();
-                            if (input.isNotEmpty) {
-                              catC.text = input;
-                              setSheetState(() {});
-                            }
+        builder: (ctx, setSheetState) {
+          final folders = folderService.folders;
+          final rootFolders = folders.where((f) => f.parentId == null).toList()
+            ..sort((a, b) => a.name.compareTo(b.name));
+
+          Widget buildFolderTree(List<Folder> items) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: items.map((folder) {
+                final children = folders.where((f) => f.parentId == folder.id).toList()
+                  ..sort((a, b) => a.name.compareTo(b.name));
+                if (children.isEmpty) {
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.folder, size: 20),
+                    title: Text(folder.name),
+                    selected: _selectedFolderId == folder.id,
+                    onTap: () {
+                      setState(() => _selectedFolderId = folder.id);
+                      Navigator.pop(ctx);
+                    },
+                  );
+                }
+                return ExpansionTile(
+                  leading: const Icon(Icons.folder, size: 20),
+                  title: Text(folder.name),
+                  children: [
+                    buildFolderTree(children),
+                    ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.folder, size: 20),
+                      title: Text(folder.name),
+                      selected: _selectedFolderId == folder.id,
+                      onTap: () {
+                        setState(() => _selectedFolderId = folder.id);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                  ],
+                );
+              }).toList(),
+            );
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16, right: 16, top: 16,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('选择文件夹', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.folder_off, size: 20),
+                          title: const Text('无文件夹'),
+                          selected: _selectedFolderId == null,
+                          onTap: () {
+                            setState(() => _selectedFolderId = null);
+                            Navigator.pop(ctx);
                           },
                         ),
-                      ),
+                        if (rootFolders.isNotEmpty) ...[
+                          const Divider(),
+                          buildFolderTree(rootFolders),
+                        ],
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: catC.text.trim().isEmpty ? null : () {
-                      _categoryC.text = catC.text.trim();
-                      Navigator.pop(ctx);
-                      setState(() {});
-                    },
-                    child: const Text('确定'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: '新建文件夹名称',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.create_new_folder_outlined, size: 20),
+                        ),
+                        onSubmitted: (v) async {
+                          if (v.trim().isNotEmpty) {
+                            await folderService.addFolder(Folder(name: v.trim()));
+                            setSheetState(() {});
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('确定'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -404,7 +359,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final title = _title.isEmpty ? (_currentNote != null ? '未命名' : '新建笔记') : _title;
-    final hasCategory = _categoryC.text.trim().isNotEmpty;
+    final folders = context.watch<LocalFolderService>().folders;
+    final selectedFolder = _selectedFolderId != null
+        ? folders.where((f) => f.id == _selectedFolderId).firstOrNull
+        : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -420,7 +378,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           TextButton(
             onPressed: _editCategory,
             child: Text(
-              hasCategory ? _categoryC.text.trim() : '文件夹',
+              selectedFolder != null ? selectedFolder.name : '文件夹',
               style: const TextStyle(fontSize: 14),
             ),
           ),

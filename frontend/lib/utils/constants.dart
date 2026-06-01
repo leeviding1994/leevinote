@@ -12,6 +12,7 @@ class ApiConstants {
   static const String signup = '/auth/signup';
   static const String login = '/auth/login';
   static const String notes = '/notes';
+  static const String folders = '/folders';
   static const String alarms = '/alarms';
   static const String music = '/music';
   static const String videos = '/videos';
