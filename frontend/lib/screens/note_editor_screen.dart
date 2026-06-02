@@ -97,7 +97,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         content: content,
         folderId: _selectedFolderId != null ? () => _selectedFolderId : null,
         updatedAt: DateTime.now(),
-        syncStatus: existing.syncStatus == 'synced' ? 'modified' : existing.syncStatus,
+        syncStatus:
+            existing.syncStatus == 'synced' ? 'modified' : existing.syncStatus,
       );
       await local.updateNote(updated);
       _currentNote = updated;
@@ -161,21 +162,35 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   List<_MoreAction> get _moreActions => [
-    _MoreAction(icon: Icons.format_bold, label: '粗体', toggleAttr: Attribute.bold),
-    _MoreAction(icon: Icons.format_italic, label: '斜体', toggleAttr: Attribute.italic),
-    _MoreAction(icon: Icons.format_underline, label: '下划线', toggleAttr: Attribute.underline),
-    _MoreAction(icon: Icons.format_strikethrough, label: '删除线', toggleAttr: Attribute.strikeThrough),
-    _MoreAction(icon: Icons.format_size, label: '字号'),
-    _MoreAction(icon: Icons.title, label: '字体'),
-    _MoreAction(icon: Icons.format_quote, label: '引用', toggleAttr: Attribute.blockQuote),
-    _MoreAction(icon: Icons.code, label: '代码块', toggleAttr: Attribute.codeBlock),
-    _MoreAction(icon: Icons.format_align_left, label: '对齐'),
-    _MoreAction(icon: Icons.format_indent_increase, label: '缩进'),
-    _MoreAction(icon: Icons.link, label: '链接'),
-    _MoreAction(icon: Icons.subscript, label: '下标'),
-    _MoreAction(icon: Icons.superscript, label: '上标'),
-    _MoreAction(icon: Icons.format_clear, label: '清除格式'),
-  ];
+        const _MoreAction(
+            icon: Icons.format_bold, label: '粗体', toggleAttr: Attribute.bold),
+        const _MoreAction(
+            icon: Icons.format_italic,
+            label: '斜体',
+            toggleAttr: Attribute.italic),
+        const _MoreAction(
+            icon: Icons.format_underline,
+            label: '下划线',
+            toggleAttr: Attribute.underline),
+        const _MoreAction(
+            icon: Icons.format_strikethrough,
+            label: '删除线',
+            toggleAttr: Attribute.strikeThrough),
+        const _MoreAction(icon: Icons.format_size, label: '字号'),
+        const _MoreAction(icon: Icons.title, label: '字体'),
+        const _MoreAction(
+            icon: Icons.format_quote,
+            label: '引用',
+            toggleAttr: Attribute.blockQuote),
+        const _MoreAction(
+            icon: Icons.code, label: '代码块', toggleAttr: Attribute.codeBlock),
+        const _MoreAction(icon: Icons.format_align_left, label: '对齐'),
+        const _MoreAction(icon: Icons.format_indent_increase, label: '缩进'),
+        const _MoreAction(icon: Icons.link, label: '链接'),
+        const _MoreAction(icon: Icons.subscript, label: '下标'),
+        const _MoreAction(icon: Icons.superscript, label: '上标'),
+        const _MoreAction(icon: Icons.format_clear, label: '清除格式'),
+      ];
 
   void _showMoreOptions() {
     showModalBottomSheet(
@@ -219,7 +234,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, textController.text.trim()),
             child: const Text('确定'),
@@ -254,7 +270,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: items.map((folder) {
-                final children = folders.where((f) => f.parentId == folder.id).toList()
+                final children = folders
+                    .where((f) => f.parentId == folder.id)
+                    .toList()
                   ..sort((a, b) => a.name.compareTo(b.name));
                 if (children.isEmpty) {
                   return ListTile(
@@ -291,14 +309,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
           return Padding(
             padding: EdgeInsets.only(
-              left: 16, right: 16, top: 16,
+              left: 16,
+              right: 16,
+              top: 16,
               bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('选择文件夹', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text('选择文件夹',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Flexible(
                   child: SingleChildScrollView(
@@ -328,14 +350,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   children: [
                     Expanded(
                       child: TextField(
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           hintText: '新建文件夹名称',
-                          border: const OutlineInputBorder(),
-                          prefixIcon: const Icon(Icons.create_new_folder_outlined, size: 20),
+                          border: OutlineInputBorder(),
+                          prefixIcon:
+                              Icon(Icons.create_new_folder_outlined, size: 20),
                         ),
                         onSubmitted: (v) async {
                           if (v.trim().isNotEmpty) {
-                            await folderService.addFolder(Folder(name: v.trim()));
+                            await folderService
+                                .addFolder(Folder(name: v.trim()));
                             setSheetState(() {});
                           }
                         },
@@ -358,7 +382,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title = _title.isEmpty ? (_currentNote != null ? '未命名' : '新建笔记') : _title;
+    final title =
+        _title.isEmpty ? (_currentNote != null ? '未命名' : '新建笔记') : _title;
     final folders = context.watch<LocalFolderService>().folders;
     final selectedFolder = _selectedFolderId != null
         ? folders.where((f) => f.id == _selectedFolderId).firstOrNull
@@ -418,7 +443,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               showLineHeightButton: false,
               customButtons: [
                 QuillToolbarCustomButtonOptions(
-                  icon: const Icon(Icons.add_photo_alternate_outlined, size: 20),
+                  icon:
+                      const Icon(Icons.add_photo_alternate_outlined, size: 20),
                   tooltip: '插入图片',
                   onPressed: _pickAndInsertImage,
                 ),

@@ -25,8 +25,7 @@ dependencies:
 
   # UI Components
   flutter_markdown: ^0.6.14
-  flutter_quill: 11.5.0
-  # flutter_quill: 11.0.0
+  flutter_quill: 11.0.0
   dart_quill_delta: 10.8.3
   table_calendar: ^3.0.9
 
@@ -52,6 +51,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+
+dependency_overrides:
+  flutter_local_notifications_windows:
+    path: ../flutter_local_notifications_windows
 
 flutter:
   uses-material-design: true
