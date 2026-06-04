@@ -7,6 +7,7 @@ class Folder {
   final String localId;
   final String name;
   final int? parentId;
+  final String? localParentId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String syncStatus;
@@ -16,6 +17,7 @@ class Folder {
     String? localId,
     required this.name,
     this.parentId,
+    this.localParentId,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.syncStatus = 'local',
@@ -28,6 +30,7 @@ class Folder {
     String? localId,
     String? name,
     int? Function()? parentId,
+    String? Function()? localParentId,
     DateTime? updatedAt,
     String? syncStatus,
   }) {
@@ -36,6 +39,7 @@ class Folder {
       localId: localId ?? this.localId,
       name: name ?? this.name,
       parentId: parentId != null ? parentId() : this.parentId,
+      localParentId: localParentId != null ? localParentId() : this.localParentId,
       updatedAt: updatedAt ?? DateTime.now(),
       syncStatus: syncStatus ?? this.syncStatus,
     );
@@ -49,6 +53,7 @@ class Folder {
       parentId: json['parent_id'] is int
           ? json['parent_id']
           : int.tryParse(json['parent_id']?.toString() ?? ''),
+      localParentId: json['local_parent_id'],
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -65,6 +70,7 @@ class Folder {
       'local_id': localId,
       'name': name,
       'parent_id': parentId,
+      'local_parent_id': localParentId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'sync_status': syncStatus,

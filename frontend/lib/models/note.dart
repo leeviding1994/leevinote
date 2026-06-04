@@ -9,6 +9,7 @@ class Note {
   final String? content;
   final String? category;
   final int? folderId;
+  final String? localFolderId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String syncStatus; // local, synced, modified, deleted
@@ -20,6 +21,7 @@ class Note {
     this.content,
     this.category,
     this.folderId,
+    this.localFolderId,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.syncStatus = 'local',
@@ -34,6 +36,7 @@ class Note {
     String? content,
     String? category,
     int? Function()? folderId,
+    String? Function()? localFolderId,
     DateTime? updatedAt,
     String? syncStatus,
   }) {
@@ -44,6 +47,7 @@ class Note {
       content: content ?? this.content,
       category: category ?? this.category,
       folderId: folderId != null ? folderId() : this.folderId,
+      localFolderId: localFolderId != null ? localFolderId() : this.localFolderId,
       createdAt: createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       syncStatus: syncStatus ?? this.syncStatus,
@@ -60,6 +64,7 @@ class Note {
       folderId: json['folder_id'] is int
           ? json['folder_id']
           : int.tryParse(json['folder_id']?.toString() ?? ''),
+      localFolderId: json['local_folder_id'],
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -78,6 +83,7 @@ class Note {
       'content': content,
       'category': category,
       'folder_id': folderId,
+      'local_folder_id': localFolderId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'sync_status': syncStatus,

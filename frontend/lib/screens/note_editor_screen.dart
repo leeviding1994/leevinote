@@ -32,6 +32,7 @@ class NoteEditorScreen extends StatefulWidget {
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
   String _title = '';
   int? _selectedFolderId;
+  String? _selectedLocalFolderId;
   late final QuillController _quillC;
   final _focusNode = FocusNode();
   Timer? _saveTimer;
@@ -45,6 +46,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     _title = widget.note?.title ?? '';
     _selectedFolderId = widget.note?.folderId;
+    _selectedLocalFolderId = widget.note?.localFolderId;
 
     if (widget.note?.content != null && widget.note!.content!.isNotEmpty) {
       final delta = Delta.fromJson(jsonDecode(widget.note!.content!) as List);
@@ -87,6 +89,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         title: _title.trim().isEmpty ? '无标题' : _title.trim(),
         content: content,
         folderId: _selectedFolderId,
+        localFolderId: _selectedLocalFolderId,
         syncStatus: 'local',
       );
       await local.addNote(note);
@@ -96,6 +99,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         title: _title.trim().isEmpty ? '无标题' : _title.trim(),
         content: content,
         folderId: _selectedFolderId != null ? () => _selectedFolderId : null,
+        localFolderId: _selectedLocalFolderId != null ? () => _selectedLocalFolderId : null,
         updatedAt: DateTime.now(),
         syncStatus:
             existing.syncStatus == 'synced' ? 'modified' : existing.syncStatus,
@@ -262,10 +266,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
-          final folders = folderService.folders;
-          final rootFolders = folders.where((f) => f.parentId == null).toList()
-            ..sort((a, b) => a.name.compareTo(b.name));
-
+          final folders = folderService.folders.where((f) => f.syncStatus != 'deleted').toList();
+          final idToLocalId = <int, String>{for (final f in folders) if (f.id != null) f.id!: f.localId};
+          final childrenMap = <String?, List<Folder>>{};
+          for (final f in folders) {
+            final parentKey = f.localParentId ?? (f.parentId != null ? idToLocalId[f.parentId] : null);
+            (childrenMap[parentKey] ??= []).add(f);
+          }
+          for (final list in childrenMap.values) {
+            list.sort((a, b) => a.name.compareTo(b.name));
+          }
+          final rootFolders = childrenMap[null] ?? const <Folder>[];
           Widget buildFolderTree(List<Folder> items) {
             return Column(
               mainAxisSize: MainAxisSize.min,
@@ -289,22 +300,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 return ExpansionTile(
                   leading: const Icon(Icons.folder, size: 20),
                   title: Text(folder.name),
-                  children: [
-                    buildFolderTree(children),
-                    ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.folder, size: 20),
-                      title: Text(folder.name),
-                      selected: _selectedFolderId == folder.id,
-                      onTap: () {
-                        setState(() => _selectedFolderId = folder.id);
-                        Navigator.pop(ctx);
-                      },
-                    ),
-                  ],
+                  selected: _selectedFolderId == folder.id,
+                  trailing: addBtn,
+                  onTap: selectFolder,
                 );
-              }).toList(),
-            );
+              }
+              return ExpansionTile(
+                leading: const Icon(Icons.folder, size: 20),
+                title: Text(folder.name),
+                trailing: addBtn,
+                children: buildFolderTree(children),
+              );
+            }).toList();
           }
 
           return Padding(
@@ -331,15 +338,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                           dense: true,
                           leading: const Icon(Icons.folder_off, size: 20),
                           title: const Text('无文件夹'),
-                          selected: _selectedFolderId == null,
+                          selected: _selectedFolderId == null && _selectedLocalFolderId == null,
                           onTap: () {
-                            setState(() => _selectedFolderId = null);
+                            setState(() {
+                              _selectedFolderId = null;
+                              _selectedLocalFolderId = null;
+                            });
                             Navigator.pop(ctx);
                           },
                         ),
                         if (rootFolders.isNotEmpty) ...[
                           const Divider(),
-                          buildFolderTree(rootFolders),
+                          ...buildFolderTree(rootFolders),
                         ],
                       ],
                     ),
@@ -382,9 +392,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title =
-        _title.isEmpty ? (_currentNote != null ? '未命名' : '新建笔记') : _title;
-    final folders = context.watch<LocalFolderService>().folders;
+    final title = _title.isEmpty ? (_currentNote != null ? '未命名' : '新建笔记') : _title;
+    final folders = context.watch<LocalFolderService>().folders.where((f) => f.syncStatus != 'deleted').toList();
     final selectedFolder = _selectedFolderId != null
         ? folders.where((f) => f.id == _selectedFolderId).firstOrNull
         : null;

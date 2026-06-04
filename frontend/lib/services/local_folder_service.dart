@@ -53,9 +53,16 @@ class LocalFolderService extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteFolder(String localId) async {
+  Future<void> deleteFolder(String localId, {bool force = false}) async {
     await ensureLoaded();
-    _folders.removeWhere((f) => f.localId == localId);
+    final i = _folders.indexWhere((f) => f.localId == localId);
+    if (i == -1) return;
+    final folder = _folders[i];
+    if (!force && folder.id != null && folder.syncStatus != 'local') {
+      _folders[i] = folder.copyWith(syncStatus: 'deleted');
+    } else {
+      _folders.removeAt(i);
+    }
     await _persist();
     notifyListeners();
   }

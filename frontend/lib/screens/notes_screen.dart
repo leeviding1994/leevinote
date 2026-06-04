@@ -69,7 +69,7 @@ class NotesScreenState extends State<NotesScreen> {
   }
 
   List<Note> get _notes => context.watch<LocalNoteService>().notes;
-  List<Folder> get _folders => context.watch<LocalFolderService>().folders;
+  List<Folder> get _folders => context.watch<LocalFolderService>().folders.where((f) => f.syncStatus != 'deleted').toList();
 
   List<Note> get _filteredNotes {
     return _notes.where((n) {
@@ -85,16 +85,30 @@ class NotesScreenState extends State<NotesScreen> {
     }).toList();
   }
 
-  List<Folder> get _rootFolders =>
-      _folders.where((f) => f.parentId == null).toList()..sort((a, b) => a.name.compareTo(b.name));
+  List<Folder> get _childFolders {
+    return _folders.where((f) {
+      if (f.syncStatus == 'deleted') return false;
+      return _getParentIdOf(f) == _selectedFolderId;
+    }).toList()..sort((a, b) => a.name.compareTo(b.name));
+  }
 
-  List<Folder> childFolders(int? parentId) =>
-      _folders.where((f) => f.parentId == parentId).toList()..sort((a, b) => a.name.compareTo(b.name));
+  int? _getParentIdOf(Folder folder) {
+    if (folder.localParentId != null) {
+      final parent = _folders.firstWhere((f) => f.localId == folder.localParentId, orElse: () => Folder(name: ''));
+      return parent.id;
+    }
+    return folder.parentId;
+  }
 
-  String _folderName(int? folderId) {
-    if (folderId == null) return '';
-    final folder = _folders.where((f) => f.id == folderId || f.localId == _folders.where((f2) => f2.id == folderId).firstOrNull?.localId).firstOrNull;
-    return folder?.name ?? '';
+  List<Folder> _buildBreadcrumb(int folderId) {
+    final path = <Folder>[];
+    final idMap = <int, Folder>{for (final f in _folders) if (f.id != null) f.id!: f};
+    int? currentId = folderId;
+    while (currentId != null && idMap.containsKey(currentId)) {
+      path.insert(0, idMap[currentId]!);
+      currentId = _getParentIdOf(idMap[currentId]!);
+    }
+    return path;
   }
 
   Future<void> sync() async {
@@ -114,20 +128,118 @@ class NotesScreenState extends State<NotesScreen> {
     try {
       await local.ensureLoaded();
       await folderService.ensureLoaded();
-      final localNotes = local.notes;
 
+      // Sync folders first (topological sort: parents before children)
+      final localIdToRemoteId = <String, int>{};
+      final localFolders = folderService.folders;
+      
+      // Build dependency graph and sort
+      final sorted = <Folder>[];
+      final visited = <String>{};
+      final folderByLocalId = <String, Folder>{for (final f in localFolders) f.localId: f};
+      
+      void visit(Folder f) {
+        if (visited.contains(f.localId)) return;
+        visited.add(f.localId);
+        // Visit parent first
+        if (f.localParentId != null && folderByLocalId.containsKey(f.localParentId)) {
+          visit(folderByLocalId[f.localParentId]!);
+        }
+        sorted.add(f);
+      }
+      
+      for (final f in localFolders) {
+        visit(f);
+      }
+
+      // Sync folders in topological order
+      for (final folder in sorted) {
+        if (folder.syncStatus == 'deleted' && folder.id != null) {
+          try {
+            await api.delete('${ApiConstants.folders}/${folder.id}');
+            await folderService.deleteFolder(folder.localId, force: true);
+          } catch (_) {}
+        } else if (folder.syncStatus == 'local' && folder.id == null) {
+          // Resolve parentId from localParentId
+          int? parentId = folder.parentId;
+          if (folder.localParentId != null && localIdToRemoteId.containsKey(folder.localParentId)) {
+            parentId = localIdToRemoteId[folder.localParentId];
+          }
+          final remoteJson = {
+            'name': folder.name,
+            'parent_id': parentId,
+          };
+          final resp = await api.post(ApiConstants.folders, remoteJson);
+          final remoteId = resp['id'];
+          final newId = remoteId is int ? remoteId : int.tryParse(remoteId?.toString() ?? '');
+          if (newId != null) {
+            localIdToRemoteId[folder.localId] = newId;
+          }
+          final updated = folder.copyWith(
+            id: newId,
+            parentId: () => parentId,
+            syncStatus: 'synced',
+          );
+          await folderService.updateFolder(updated);
+        } else if (folder.syncStatus == 'modified' && folder.id != null) {
+          int? parentId = folder.parentId;
+          if (folder.localParentId != null && localIdToRemoteId.containsKey(folder.localParentId)) {
+            parentId = localIdToRemoteId[folder.localParentId];
+          }
+          final remoteJson = {
+            'name': folder.name,
+            'parent_id': parentId,
+          };
+          await api.put('${ApiConstants.folders}/${folder.id}', remoteJson);
+          await folderService.updateFolder(folder.copyWith(
+            parentId: () => parentId,
+            syncStatus: 'synced',
+          ));
+        } else if (folder.id != null) {
+          // Already synced, just record the mapping
+          localIdToRemoteId[folder.localId] = folder.id!;
+        }
+      }
+
+      // Sync notes
+      final localNotes = local.notes;
       for (final note in List.from(localNotes)) {
         if (note.syncStatus == 'local' && note.id == null) {
-          final resp = await api.post(ApiConstants.notes, note.toRemoteJson());
+          // Resolve folderId from localFolderId
+          int? folderId = note.folderId;
+          if (note.localFolderId != null && localIdToRemoteId.containsKey(note.localFolderId)) {
+            folderId = localIdToRemoteId[note.localFolderId];
+          }
+          final remoteJson = {
+            'title': note.title,
+            'content': note.content,
+            'category': note.category,
+            'folder_id': folderId,
+          };
+          final resp = await api.post(ApiConstants.notes, remoteJson);
           final remoteId = resp['id'];
           final updated = note.copyWith(
             id: remoteId is int ? remoteId : int.tryParse(remoteId?.toString() ?? ''),
+            folderId: () => folderId,
             syncStatus: 'synced',
           );
           await local.updateNote(updated);
         } else if (note.syncStatus == 'modified' && note.id != null) {
-          await api.put('${ApiConstants.notes}/${note.id}', note.toRemoteJson());
-          await local.updateNote(note.copyWith(syncStatus: 'synced'));
+          int? folderId = note.folderId;
+          if (note.localFolderId != null && localIdToRemoteId.containsKey(note.localFolderId)) {
+            folderId = localIdToRemoteId[note.localFolderId];
+          }
+          final remoteJson = {
+            'title': note.title,
+            'content': note.content,
+            'category': note.category,
+            'folder_id': folderId,
+          };
+          await api.put('${ApiConstants.notes}/${note.id}', remoteJson);
+          await local.updateNote(note.copyWith(
+            folderId: () => folderId,
+            syncStatus: 'synced',
+          ));
         } else if (note.syncStatus == 'deleted' && note.id != null) {
           try {
             await api.delete('${ApiConstants.notes}/${note.id}');
@@ -142,7 +254,6 @@ class NotesScreenState extends State<NotesScreen> {
         await local.addOrUpdateFromRemote(remote);
       }
 
-      // Sync folders
       final remoteFolders = await api.getList(ApiConstants.folders);
       for (final e in remoteFolders) {
         final remote = Folder.fromJson(e as Map<String, dynamic>);
@@ -182,6 +293,18 @@ class NotesScreenState extends State<NotesScreen> {
     );
   }
 
+  Future<void> openEditorInFolder(int? folderId) async {
+    setState(() => _selectedFolderId = folderId);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => NoteEditorScreen(note: null)),
+    );
+  }
+
+  void selectFolder(int? folderId) {
+    setState(() => _selectedFolderId = folderId);
+  }
+
   String _plainText(String? content) {
     if (content == null || content.isEmpty) return '';
     try {
@@ -195,203 +318,74 @@ class NotesScreenState extends State<NotesScreen> {
     }
   }
 
-  List<Widget> _buildFolderTreeWidget(List<Folder> folders, Function(int) onSelect) {
-    if (folders.isEmpty) return [];
-    return folders.map((folder) {
-      final children = childFolders(folder.id);
-      if (children.isEmpty) {
-        return ListTile(
-          dense: true,
-          leading: const Icon(Icons.folder, size: 20),
-          title: Text(folder.name),
-          selected: _selectedFolderId == folder.id,
-          trailing: IconButton(
-            icon: const Icon(Icons.delete_outline, size: 18),
-            onPressed: () => _deleteFolder(folder),
-          ),
-          onTap: () => onSelect(folder.id!),
-        );
-      }
-      return ExpansionTile(
-        leading: const Icon(Icons.folder, size: 20),
-        title: Text(folder.name),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, size: 18),
-          onPressed: () => _deleteFolder(folder),
-        ),
-        children: [
-          ..._buildFolderTreeWidget(children, onSelect),
-          ListTile(
-              dense: true,
-              leading: const Icon(Icons.folder, size: 20),
-              title: Text(folder.name),
-              selected: _selectedFolderId == folder.id,
-              onTap: () => onSelect(folder.id!),
-            ),
-          ],
-        );
-      }).toList();
-  }
 
-  void _deleteFolder(Folder folder) async {
-    final folderService = context.read<LocalFolderService>();
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除文件夹'),
-        content: Text('确定要删除文件夹"${folder.name}"吗？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定')),
-        ],
-      ),
-    );
-    if (confirm == true) {
-      await folderService.deleteFolder(folder.localId);
-      if (_selectedFolderId == folder.id) {
-        setState(() => _selectedFolderId = null);
-      }
-    }
-  }
-
-  void _addSubFolder(Folder? parent) async {
-    final nameC = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(parent == null ? '新建文件夹' : '在"${parent.name}"下新建'),
-        content: TextField(
-          controller: nameC,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '文件夹名称'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, nameC.text.trim()), child: const Text('确定')),
-        ],
-      ),
-    );
-    if (result != null && result.isNotEmpty) {
-      final folderService = context.read<LocalFolderService>();
-      await folderService.addFolder(Folder(
-        name: result,
-        parentId: parent?.id,
-      ));
-    }
-  }
-
-  void _showFolderPicker() {
-    if (_folders.isEmpty) {
-      _addSubFolder(null);
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('选择文件夹'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.folder_special, size: 20),
-                  title: const Text('全部文件夹'),
-                  selected: _selectedFolderId == null,
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    setState(() => _selectedFolderId = null);
-                  },
-                ),
-                const Divider(),
-                ..._buildFolderTreeWidget(_rootFolders, (folderId) {
-                  Navigator.pop(ctx);
-                  setState(() => _selectedFolderId = folderId);
-                }),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton.icon(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _addSubFolder(null);
-            },
-            icon: const Icon(Icons.create_new_folder, size: 18),
-            label: const Text('新建文件夹'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredNotes;
+    final childFolders = _searchC.text.isEmpty ? _childFolders : <Folder>[];
+    final totalItems = childFolders.length + filtered.length;
 
     return Column(
       children: [
+        if (_selectedFolderId != null)
+          Container(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: () => setState(() => _selectedFolderId = null),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      child: Text('全部', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 14)),
+                    ),
+                  ),
+                  ..._buildBreadcrumb(_selectedFolderId!).expand((folder) => [
+                    Icon(Icons.chevron_right, size: 18, color: Theme.of(context).colorScheme.outline),
+                    InkWell(
+                      onTap: () => setState(() => _selectedFolderId = folder.id),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        child: Text(
+                          folder.name,
+                          style: TextStyle(
+                            color: folder.id == _selectedFolderId
+                                ? Theme.of(context).colorScheme.onSurface
+                                : Theme.of(context).colorScheme.primary,
+                            fontSize: 14,
+                            fontWeight: folder.id == _selectedFolderId ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ]),
+                ],
+              ),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Row(
-            children: [
-              InkWell(
-                onTap: _showFolderPicker,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Theme.of(context).colorScheme.outline),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.folder, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        _selectedFolderId == null
-                            ? '全部文件夹'
-                            : _folderName(_selectedFolderId),
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_drop_down, size: 20),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _searchC,
-                  decoration: InputDecoration(
-                    hintText: '搜索标题或内容...',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: _searchC.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              _searchC.clear();
-                              setState(() {});
-                            },
-                          )
-                        : null,
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-            ],
+          child: TextField(
+            controller: _searchC,
+            decoration: InputDecoration(
+              hintText: '搜索标题或内容...',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _searchC.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        _searchC.clear();
+                        setState(() {});
+                      },
+                    )
+                  : null,
+            ),
+            onChanged: (_) => setState(() {}),
           ),
         ),
         const Divider(height: 1),
@@ -415,7 +409,7 @@ class NotesScreenState extends State<NotesScreen> {
             ),
           ),
         Expanded(
-          child: _notes.isEmpty
+          child: totalItems == 0 && !_selectionMode
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -423,90 +417,95 @@ class NotesScreenState extends State<NotesScreen> {
                       Icon(Icons.note_add, size: 64,
                           color: Theme.of(context).colorScheme.outline),
                       const SizedBox(height: 16),
-                      Text('还没有笔记，点击右下角新建',
+                      Text('还没有内容，点击右下角新建',
                           style: TextStyle(color: Theme.of(context).colorScheme.outline)),
                     ],
                   ),
                 )
-              : filtered.isEmpty
-                  ? const Center(child: Text('没有匹配的笔记'))
-                  : RefreshIndicator(
-                      onRefresh: () async {},
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(8),
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) {
-                          final note = filtered[index];
-                          final preview = _plainText(note.content);
-                          return Card(
-                            child: InkWell(
-                              onTap: () {
-                                if (_selectionMode) {
-                                  setState(() {
-                                    if (_selectedIds.contains(note.localId)) {
-                                      _selectedIds.remove(note.localId);
-                                      if (_selectedIds.isEmpty) _selectionMode = false;
-                                    } else {
-                                      _selectedIds.add(note.localId);
-                                    }
-                                  });
+              : RefreshIndicator(
+                  onRefresh: () async {},
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: totalItems,
+                    itemBuilder: (context, index) {
+                      if (index < childFolders.length) {
+                        final folder = childFolders[index];
+                        return Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.folder, size: 24),
+                            title: Text(folder.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            onTap: () => setState(() => _selectedFolderId = folder.id),
+                          ),
+                        );
+                      }
+                      final note = filtered[index - childFolders.length];
+                      final preview = _plainText(note.content);
+                      return Card(
+                        child: InkWell(
+                          onTap: () {
+                            if (_selectionMode) {
+                              setState(() {
+                                if (_selectedIds.contains(note.localId)) {
+                                  _selectedIds.remove(note.localId);
+                                  if (_selectedIds.isEmpty) _selectionMode = false;
                                 } else {
-                                  openEditor(note);
-                                }
-                              },
-                              onLongPress: () {
-                                setState(() {
-                                  _selectionMode = true;
                                   _selectedIds.add(note.localId);
-                                });
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                                child: Row(
-                                  children: [
-                                    if (_selectionMode)
-                                      Checkbox(
-                                        value: _selectedIds.contains(note.localId),
-                                        onChanged: (v) {
-                                          setState(() {
-                                            if (v == true) {
-                                              _selectedIds.add(note.localId);
-                                            } else {
-                                              _selectedIds.remove(note.localId);
-                                              if (_selectedIds.isEmpty) _selectionMode = false;
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    Expanded(
-                                      child: ListTile(
-                                        title: Row(
-                                          children: [
-                                            Expanded(child: Text(note.title, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                                            if (note.syncStatus != 'synced')
-                                              Padding(
-                                                padding: const EdgeInsets.only(left: 4),
-                                                child: Icon(Icons.cloud_off, size: 14,
-                                                    color: Theme.of(context).colorScheme.outline),
-                                              ),
-                                          ],
-                                        ),
-                                        subtitle: preview.isNotEmpty
-                                            ? Text(preview, maxLines: 2, overflow: TextOverflow.ellipsis)
-                                            : null,
-                                        trailing: note.folderId != null
-                                            ? Chip(label: Text(_folderName(note.folderId), style: const TextStyle(fontSize: 12)))
-                                            : null,
-                                      ),
+                                }
+                              });
+                            } else {
+                              openEditor(note);
+                            }
+                          },
+                          onLongPress: () {
+                            setState(() {
+                              _selectionMode = true;
+                              _selectedIds.add(note.localId);
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Row(
+                              children: [
+                                if (_selectionMode)
+                                  Checkbox(
+                                    value: _selectedIds.contains(note.localId),
+                                    onChanged: (v) {
+                                      setState(() {
+                                        if (v == true) {
+                                          _selectedIds.add(note.localId);
+                                        } else {
+                                          _selectedIds.remove(note.localId);
+                                          if (_selectedIds.isEmpty) _selectionMode = false;
+                                        }
+                                      });
+                                    },
+                                  ),
+                                Expanded(
+                                  child: ListTile(
+                                    title: Row(
+                                      children: [
+                                        Expanded(child: Text(note.title, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                        if (note.syncStatus != 'synced')
+                                          Padding(
+                                            padding: const EdgeInsets.only(left: 4),
+                                            child: Icon(Icons.cloud_off, size: 14,
+                                                color: Theme.of(context).colorScheme.outline),
+                                          ),
+                                      ],
                                     ),
-                                  ],
+                                    subtitle: preview.isNotEmpty
+                                        ? Text(preview, maxLines: 2, overflow: TextOverflow.ellipsis)
+                                        : null,
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
-                          );
-                        },
-                      ),
-                    ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
         ),
       ],
     );

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:leevinote/models/folder.dart';
 import 'package:leevinote/screens/notes_screen.dart';
 import 'package:leevinote/screens/alarms_screen.dart';
 import 'package:leevinote/screens/music_screen.dart';
 import 'package:leevinote/screens/videos_screen.dart';
 import 'package:leevinote/screens/schedules_screen.dart';
+import 'package:leevinote/services/api_service.dart';
 import 'package:leevinote/services/auth_service.dart';
+import 'package:leevinote/services/local_folder_service.dart';
+import 'package:leevinote/utils/constants.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final _notesKey = GlobalKey<NotesScreenState>();
+  final Set<String> _expandedFolders = {};
 
   final List<String> _titles = [
     '笔记',
@@ -42,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
         ],
       ),
+      drawer: _currentIndex == 0 ? _buildFolderDrawer() : null,
       body: IndexedStack(
         index: _currentIndex,
         children: [
@@ -74,5 +80,202 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildFolderDrawer() {
+    final folderService = context.watch<LocalFolderService>();
+    final allFolders = folderService.folders.where((f) => f.syncStatus != 'deleted').toList();
+
+    final idToLocalId = <int, String>{for (final f in allFolders) if (f.id != null) f.id!: f.localId};
+    final childrenMap = <String?, List<Folder>>{};
+    for (final f in allFolders) {
+      final parentKey = f.localParentId ?? (f.parentId != null ? idToLocalId[f.parentId] : null);
+      (childrenMap[parentKey] ??= []).add(f);
+    }
+    for (final list in childrenMap.values) {
+      list.sort((a, b) => a.name.compareTo(b.name));
+    }
+    final rootFolders = childrenMap[null] ?? const <Folder>[];
+
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.notes),
+              title: const Text('全部笔记'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.create_new_folder_outlined),
+                    tooltip: '新建文件夹',
+                    onPressed: () => _addFolder(null),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: '关闭',
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _notesKey.currentState?.selectFolder(null);
+              },
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: _buildDrawerFolderTree(rootFolders, childrenMap),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildDrawerFolderTree(
+    List<Folder> folders,
+    Map<String?, List<Folder>> childrenMap, {
+    int depth = 0,
+  }) {
+    final leftPadding = 16.0 + depth * 24.0;
+    final result = <Widget>[];
+    
+    for (final folder in folders) {
+      final children = childrenMap[folder.localId] ?? const <Folder>[];
+      final hasChildren = children.isNotEmpty;
+      final isExpanded = _expandedFolders.contains(folder.localId);
+      
+      result.add(
+        InkWell(
+          onLongPress: () => _showFolderMenu(folder),
+          onTap: () {
+            Navigator.pop(context);
+            _notesKey.currentState?.selectFolder(folder.id);
+          },
+          child: Padding(
+            padding: EdgeInsets.only(left: leftPadding, right: 16, top: 8, bottom: 8),
+            child: Row(
+              children: [
+                if (hasChildren)
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (isExpanded) {
+                          _expandedFolders.remove(folder.localId);
+                        } else {
+                          _expandedFolders.add(folder.localId);
+                        }
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
+                        size: 20,
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(width: 28),
+                const Icon(Icons.folder, size: 20),
+                const SizedBox(width: 12),
+                Expanded(child: Text(folder.name, overflow: TextOverflow.ellipsis)),
+              ],
+            ),
+          ),
+        ),
+      );
+      
+      if (hasChildren && isExpanded) {
+        result.addAll(_buildDrawerFolderTree(children, childrenMap, depth: depth + 1));
+      }
+    }
+    
+    return result;
+  }
+
+  void _showFolderMenu(Folder folder) {
+    showMenu<String>(
+      context: context,
+      position: const RelativeRect.fromLTRB(100, 200, 100, 200),
+      items: [
+        const PopupMenuItem(value: 'note', child: ListTile(
+          leading: Icon(Icons.note_add, size: 20),
+          title: Text('新建笔记'),
+          dense: true,
+        )),
+        const PopupMenuItem(value: 'subfolder', child: ListTile(
+          leading: Icon(Icons.create_new_folder_outlined, size: 20),
+          title: Text('新建子文件夹'),
+          dense: true,
+        )),
+        const PopupMenuItem(value: 'delete', child: ListTile(
+          leading: Icon(Icons.delete_outline, size: 20),
+          title: Text('删除文件夹'),
+          dense: true,
+        )),
+      ],
+    ).then((value) {
+      if (value == null) return;
+      switch (value) {
+        case 'note':
+          Navigator.pop(context);
+          _notesKey.currentState?.openEditorInFolder(folder.id);
+        case 'subfolder':
+          _addFolder(folder);
+        case 'delete':
+          _deleteFolder(folder);
+      }
+    });
+  }
+
+  void _addFolder(Folder? parent) async {
+    final nameC = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(parent == null ? '新建文件夹' : '在"${parent.name}"下新建'),
+        content: TextField(
+          controller: nameC,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '文件夹名称'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, nameC.text.trim()), child: const Text('确定')),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty) {
+      final folderService = context.read<LocalFolderService>();
+      await folderService.addFolder(Folder(
+        name: result,
+        parentId: parent?.id,
+        localParentId: parent?.localId,
+      ));
+    }
+  }
+
+  void _deleteFolder(Folder folder) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除文件夹'),
+        content: Text('确定要删除文件夹"${folder.name}"吗？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定')),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      final folderService = context.read<LocalFolderService>();
+      await folderService.deleteFolder(folder.localId);
+    }
   }
 }
