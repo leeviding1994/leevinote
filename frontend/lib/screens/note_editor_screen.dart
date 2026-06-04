@@ -277,27 +277,52 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             list.sort((a, b) => a.name.compareTo(b.name));
           }
           final rootFolders = childrenMap[null] ?? const <Folder>[];
-          Widget buildFolderTree(List<Folder> items) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: items.map((folder) {
-                final children = folders
-                    .where((f) => f.parentId == folder.id)
-                    .toList()
-                  ..sort((a, b) => a.name.compareTo(b.name));
-                if (children.isEmpty) {
-                  return ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.folder, size: 20),
-                    title: Text(folder.name),
-                    selected: _selectedFolderId == folder.id,
-                    onTap: () {
-                      setState(() => _selectedFolderId = folder.id);
-                      Navigator.pop(ctx);
-                    },
-                  );
-                }
-                return ExpansionTile(
+
+          Future<void> addSubFolder(Folder parent) async {
+            final nameC = TextEditingController();
+            final name = await showDialog<String>(
+              context: context,
+              builder: (dCtx) => AlertDialog(
+                title: Text('在"${parent.name}"下新建'),
+                content: TextField(
+                  controller: nameC,
+                  autofocus: true,
+                  decoration: const InputDecoration(hintText: '文件夹名称'),
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
+                  TextButton(onPressed: () => Navigator.pop(dCtx, nameC.text.trim()), child: const Text('确定')),
+                ],
+              ),
+            );
+            if (name != null && name.isNotEmpty) {
+              await folderService.addFolder(Folder(
+                name: name,
+                parentId: parent.id,
+                localParentId: parent.localId,
+              ));
+              setSheetState(() {});
+            }
+          }
+
+          List<Widget> buildFolderTree(List<Folder> items) {
+            return items.map((folder) {
+              final children = childrenMap[folder.localId] ?? const <Folder>[];
+              final addBtn = IconButton(
+                icon: const Icon(Icons.add, size: 18),
+                tooltip: '新建子文件夹',
+                onPressed: () => addSubFolder(folder),
+              );
+              void selectFolder() {
+                setState(() {
+                  _selectedFolderId = folder.id;
+                  _selectedLocalFolderId = folder.localId;
+                });
+                Navigator.pop(ctx);
+              }
+              if (children.isEmpty) {
+                return ListTile(
+                  dense: true,
                   leading: const Icon(Icons.folder, size: 20),
                   title: Text(folder.name),
                   selected: _selectedFolderId == folder.id,

@@ -335,6 +335,7 @@ class NotesScreenState extends State<NotesScreen> {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   InkWell(
                     onTap: () => setState(() => _selectedFolderId = null),
