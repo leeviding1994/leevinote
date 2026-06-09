@@ -29,6 +29,8 @@ class AlarmService extends ChangeNotifier {
     if (_initialized) return;
     try {
       tz_data.initializeTimeZones();
+      // 设置本地时区为中国东八区（避免 tz.local 默认为 UTC）
+      tz.setLocalLocation(tz.getLocation('Asia/Shanghai'));
 
       _notificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -50,16 +52,39 @@ class AlarmService extends ChangeNotifier {
 
       await _notificationsPlugin!.initialize(settings: initSettings);
 
-      // Request Android permissions (native system dialog, not grayed out)
+      // Request Android permissions and create notification channel
       if (defaultTargetPlatform == TargetPlatform.android) {
         final androidPlugin = _notificationsPlugin!
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>();
         if (androidPlugin != null) {
-          await androidPlugin.requestNotificationsPermission();
-          // Android 12+ requires runtime permission for exact alarms.
-          // This will open a system settings page if the toggle is not grayed out.
-          await androidPlugin.requestExactAlarmsPermission();
+          // 1. 删除旧渠道并创建新渠道（Android 渠道一旦创建属性不可更改，必须换 ID）
+          await androidPlugin.deleteNotificationChannel(channelId: 'alarm_channel');
+          const channel = AndroidNotificationChannel(
+            'alarm_channel_v2',
+            '闹钟提醒',
+            description: '闹钟提醒通知',
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+            showBadge: true,
+          );
+          await androidPlugin.createNotificationChannel(channel);
+
+          // 2. 请求通知权限（Android 13+）
+          final granted = await androidPlugin.requestNotificationsPermission();
+          if (granted != true) {
+            debugPrint('通知权限未授予，闹钟将无法正常显示');
+          }
+
+          // 3. 请求精确闹钟权限（Android 12+）
+          // 若已声明 USE_EXACT_ALARM（Android 14 普通权限），通常无需请求。
+          // 为兼容 Android 12/13，用 try-catch 避免阻塞整个初始化。
+          try {
+            await androidPlugin.requestExactAlarmsPermission();
+          } catch (e) {
+            debugPrint('精确闹钟权限请求被忽略或失败: $e');
+          }
         }
       }
 
@@ -216,11 +241,13 @@ class AlarmService extends ChangeNotifier {
     if (_notificationsPlugin == null) return '通知插件未初始化';
     try {
       const androidDetails = AndroidNotificationDetails(
-        'alarm_channel',
+        'alarm_channel_v2',
         '闹钟提醒',
         channelDescription: '闹钟提醒通知',
-        importance: Importance.high,
+        importance: Importance.max,
         priority: Priority.high,
+        category: AndroidNotificationCategory.alarm,
+        visibility: NotificationVisibility.public,
         fullScreenIntent: true,
         playSound: true,
         enableVibration: true,
@@ -280,11 +307,13 @@ class AlarmService extends ChangeNotifier {
       await _notificationsPlugin!.cancel(id: _notificationId(alarm));
 
       const androidDetails = AndroidNotificationDetails(
-        'alarm_channel',
+        'alarm_channel_v2',
         '闹钟提醒',
         channelDescription: '闹钟提醒通知',
-        importance: Importance.high,
+        importance: Importance.max,
         priority: Priority.high,
+        category: AndroidNotificationCategory.alarm,
+        visibility: NotificationVisibility.public,
         fullScreenIntent: true,
         playSound: true,
         enableVibration: true,
@@ -297,6 +326,14 @@ class AlarmService extends ChangeNotifier {
       const details = NotificationDetails(
         android: androidDetails,
         iOS: iosDetails,
+      );
+
+      // 先立即发送一条通知，确认渠道和权限正常
+      await _notificationsPlugin!.show(
+        id: _notificationId(alarm),
+        title: alarm.title,
+        body: '测试触发 — 原定 ${alarm.alarmTime.hour}:${alarm.alarmTime.minute.toString().padLeft(2, '0')}',
+        notificationDetails: details,
       );
 
       final now = tz.TZDateTime.now(tz.local);
@@ -326,15 +363,7 @@ class AlarmService extends ChangeNotifier {
         }
       }
 
-      // 精确闹钟权限未授予，zonedSchedule 无法保证 5 秒后准时触发
-      // 直接立即发送通知，让用户立刻看到效果
-      await _notificationsPlugin!.show(
-        id: _notificationId(alarm),
-        title: alarm.title,
-        body: '测试触发（立即）— 原定 ${alarm.alarmTime.hour}:${alarm.alarmTime.minute.toString().padLeft(2, '0')}',
-        notificationDetails: details,
-      );
-      return '未授予精确闹钟权限，已立即显示通知。请前往系统设置 → 应用 → 本应用 → 闹钟与提醒 → 允许精确闹钟，以确保定时闹钟正常工作。';
+      return '已立即显示通知，但 5 秒后定时调度失败（请检查系统设置中是否允许精确闹钟）。';
     } catch (e) {
       return '触发失败: $e';
     }
@@ -344,11 +373,13 @@ class AlarmService extends ChangeNotifier {
     if (_notificationsPlugin == null || !alarm.enabled) return;
 
     const androidDetails = AndroidNotificationDetails(
-      'alarm_channel',
+      'alarm_channel_v2',
       '闹钟提醒',
       channelDescription: '闹钟提醒通知',
-      importance: Importance.high,
+      importance: Importance.max,
       priority: Priority.high,
+      category: AndroidNotificationCategory.alarm,
+      visibility: NotificationVisibility.public,
       fullScreenIntent: true,
       playSound: true,
       enableVibration: true,
@@ -364,10 +395,27 @@ class AlarmService extends ChangeNotifier {
     );
 
     final scheduledDate = tz.TZDateTime.from(alarm.alarmTime, tz.local);
-    if (scheduledDate.isBefore(tz.TZDateTime.now(tz.local))) {
+    final now = tz.TZDateTime.now(tz.local);
+    debugPrint('闹钟 "${alarm.title}" 原始时间: $scheduledDate, 当前时间: $now');
+
+    if (scheduledDate.isBefore(now)) {
       if (alarm.repeatPattern != null) {
+        // 重复闹钟：调到明天同一时间
         final tomorrow = scheduledDate.add(const Duration(days: 1));
+        debugPrint('闹钟 "${alarm.title}" 时间已过，重复闹钟调至明天: $tomorrow');
         await _zonedScheduleWithFallback(alarm, tomorrow, details);
+      } else {
+        // 单次闹钟：如果时间已过但在 2 分钟内（用户刚点击保存），仍然允许调度
+        // 否则调到明天同一时间
+        final diff = now.difference(scheduledDate);
+        if (diff.inMinutes <= 2) {
+          debugPrint('闹钟 "${alarm.title}" 时间已过 ${diff.inSeconds}s，仍在容错范围内，立即调度');
+          await _zonedScheduleWithFallback(alarm, now.add(const Duration(seconds: 2)), details);
+        } else {
+          final tomorrow = scheduledDate.add(const Duration(days: 1));
+          debugPrint('闹钟 "${alarm.title}" 时间已过 ${diff.inMinutes}m，单次闹钟调至明天: $tomorrow');
+          await _zonedScheduleWithFallback(alarm, tomorrow, details);
+        }
       }
       return;
     }
@@ -375,9 +423,8 @@ class AlarmService extends ChangeNotifier {
     await _zonedScheduleWithFallback(alarm, scheduledDate, details);
   }
 
-  /// 使用 alarmClock 调度（AlarmManager.setAlarmClock），
-  /// 这是 Android 闹钟专用 API，无需 SCHEDULE_EXACT_ALARM 权限，
-  /// 且在国内 ROM 上通常不会被拦截。
+  /// 使用 alarmClock 调度（AlarmManager.setAlarmClock）。
+  /// Android 14 已声明 USE_EXACT_ALARM 普通权限，setAlarmClock 可直接使用。
   /// 若失败则依次回退 exactAllowWhileIdle → inexactAllowWhileIdle。
   Future<void> _zonedScheduleWithFallback(
     Alarm alarm,

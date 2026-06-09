@@ -19,7 +19,7 @@ class AlarmsScreenState extends State<AlarmsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final service = context.read<AlarmService>();
-      service.initialize();
+      // load() 内部会调用 initialize()，不要单独调用，避免并发权限请求
       service.load();
     });
   }
