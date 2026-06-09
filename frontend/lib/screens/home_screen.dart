@@ -6,10 +6,8 @@ import 'package:leevinote/screens/alarms_screen.dart';
 import 'package:leevinote/screens/music_screen.dart';
 import 'package:leevinote/screens/videos_screen.dart';
 import 'package:leevinote/screens/schedules_screen.dart';
-import 'package:leevinote/services/api_service.dart';
 import 'package:leevinote/services/auth_service.dart';
 import 'package:leevinote/services/local_folder_service.dart';
-import 'package:leevinote/utils/constants.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,7 +19,19 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final _notesKey = GlobalKey<NotesScreenState>();
+  final _alarmsKey = GlobalKey<AlarmsScreenState>();
+  final _musicKey = GlobalKey<MusicScreenState>();
+  final _videosKey = GlobalKey<VideosScreenState>();
+  final _schedulesKey = GlobalKey<SchedulesScreenState>();
   final Set<String> _expandedFolders = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _notesKey.currentState?.onFolderChanged = () => setState(() {});
+    });
+  }
 
   final List<String> _titles = [
     '笔记',
@@ -37,13 +47,39 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_currentIndex]),
+        title: _currentIndex == 0 && _notesKey.currentState != null
+            ? _notesKey.currentState!.buildBreadcrumbWidget()
+            : Text(_titles[_currentIndex]),
         actions: [
           if (_currentIndex == 0)
             IconButton(
               icon: const Icon(Icons.sync),
               tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
               onPressed: () => _notesKey.currentState?.sync(),
+            ),
+          if (_currentIndex == 1)
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+              onPressed: () => _alarmsKey.currentState?.sync(),
+            ),
+          if (_currentIndex == 2)
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+              onPressed: () => _musicKey.currentState?.sync(),
+            ),
+          if (_currentIndex == 3)
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+              onPressed: () => _videosKey.currentState?.sync(),
+            ),
+          if (_currentIndex == 4)
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+              onPressed: () => _schedulesKey.currentState?.sync(),
             ),
         ],
       ),
@@ -52,15 +88,18 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _currentIndex,
         children: [
           NotesScreen(key: _notesKey),
-          const AlarmsScreen(),
-          const MusicScreen(),
-          const VideosScreen(),
-          const SchedulesScreen(),
+          AlarmsScreen(key: _alarmsKey),
+          MusicScreen(key: _musicKey),
+          VideosScreen(key: _videosKey),
+          SchedulesScreen(key: _schedulesKey),
         ],
       ),
       floatingActionButton: _currentIndex == 0
           ? FloatingActionButton(
-              onPressed: () => _notesKey.currentState?.openEditor(null),
+              onPressed: () => _notesKey.currentState?.openEditor(
+                null,
+                defaultLocalFolderId: _notesKey.currentState?.selectedLocalFolderId,
+              ),
               child: const Icon(Icons.add),
             )
           : null,
@@ -155,7 +194,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onLongPress: () => _showFolderMenu(folder),
           onTap: () {
             Navigator.pop(context);
-            _notesKey.currentState?.selectFolder(folder.id);
+            _notesKey.currentState?.selectFolder(folder.localId);
           },
           child: Padding(
             padding: EdgeInsets.only(left: leftPadding, right: 16, top: 8, bottom: 8),
@@ -219,17 +258,25 @@ class _HomeScreenState extends State<HomeScreen> {
           title: Text('删除文件夹'),
           dense: true,
         )),
+        const PopupMenuItem(value: 'move', child: ListTile(
+          leading: Icon(Icons.drive_file_move_outline, size: 20),
+          title: Text('移动'),
+          dense: true,
+        )),
       ],
     ).then((value) {
       if (value == null) return;
       switch (value) {
         case 'note':
           Navigator.pop(context);
-          _notesKey.currentState?.openEditorInFolder(folder.id);
+          _notesKey.currentState?.openEditorInFolder(folder.localId);
         case 'subfolder':
           _addFolder(folder);
         case 'delete':
           _deleteFolder(folder);
+        case 'move':
+          Navigator.pop(context);
+          _notesKey.currentState?.moveFolder(folder);
       }
     });
   }

@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:dart_quill_delta/dart_quill_delta.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:leevinote/models/note.dart';
 import 'package:leevinote/models/folder.dart';
 import 'package:leevinote/services/api_service.dart';
@@ -22,8 +25,9 @@ class _MoreAction {
 
 class NoteEditorScreen extends StatefulWidget {
   final Note? note;
+  final String? defaultLocalFolderId;
 
-  const NoteEditorScreen({super.key, this.note});
+  const NoteEditorScreen({super.key, this.note, this.defaultLocalFolderId});
 
   @override
   State<NoteEditorScreen> createState() => _NoteEditorScreenState();
@@ -46,7 +50,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     _title = widget.note?.title ?? '';
     _selectedFolderId = widget.note?.folderId;
-    _selectedLocalFolderId = widget.note?.localFolderId;
+    _selectedLocalFolderId = widget.note?.localFolderId ?? widget.defaultLocalFolderId;
 
     if (widget.note?.content != null && widget.note!.content!.isNotEmpty) {
       final delta = Delta.fromJson(jsonDecode(widget.note!.content!) as List);
@@ -98,8 +102,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       final updated = existing.copyWith(
         title: _title.trim().isEmpty ? '无标题' : _title.trim(),
         content: content,
-        folderId: _selectedFolderId != null ? () => _selectedFolderId : null,
-        localFolderId: _selectedLocalFolderId != null ? () => _selectedLocalFolderId : null,
+        folderId: () => _selectedFolderId,
+        localFolderId: () => _selectedLocalFolderId,
         updatedAt: DateTime.now(),
         syncStatus:
             existing.syncStatus == 'synced' ? 'modified' : existing.syncStatus,
@@ -127,34 +131,49 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     final file = result.files.single;
     if (!mounted) return;
-    final api = context.read<ApiService>();
 
     try {
-      Map<String, dynamic> resp;
-      if (file.bytes != null) {
-        resp = await api.uploadBytes('/files/upload', file.bytes!, file.name);
-      } else if (file.path != null) {
-        resp = await api.uploadFile('/files/upload', file.path!);
+      String imagePath;
+      if (kIsWeb) {
+        final api = context.read<ApiService>();
+        Map<String, dynamic> resp;
+        if (file.bytes != null) {
+          resp = await api.uploadBytes('/files/upload', file.bytes!, file.name);
+        } else {
+          return;
+        }
+        imagePath = resp['url'] as String;
       } else {
-        return;
+        final dir = await getApplicationDocumentsDirectory();
+        final imageDir = Directory('${dir.path}/leevinote/images');
+        if (!await imageDir.exists()) {
+          await imageDir.create(recursive: true);
+        }
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final ext = file.extension ?? 'png';
+        final localFile = File('${imageDir.path}/$timestamp.$ext');
+        if (file.bytes != null) {
+          await localFile.writeAsBytes(file.bytes!);
+        } else if (file.path != null) {
+          await File(file.path!).copy(localFile.path);
+        }
+        imagePath = 'local://${localFile.path}';
       }
 
-      final filename = resp['url'] as String;
-      if (!mounted) return;
       final index = _quillC.selection.baseOffset;
       final length = _quillC.selection.extentOffset - index;
 
       _quillC.replaceText(
         index,
         length,
-        BlockEmbed.image(filename),
+        BlockEmbed.image(imagePath),
         TextSelection.collapsed(offset: index + 1),
       );
     } catch (e, st) {
-      debugPrint('图片上传失败: $e\n$st');
+      debugPrint('图片插入失败: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('图片上传失败: $e')),
+          SnackBar(content: Text('图片插入失败: $e')),
         );
       }
     }
@@ -261,11 +280,24 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final folderService = context.read<LocalFolderService>();
     await folderService.ensureLoaded();
 
+    final expandedFolders = <String>{};
+
+    final prevLocalFolderId = _selectedLocalFolderId;
+
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
+          // Resolve _selectedLocalFolderId from _selectedFolderId if needed
+          if (_selectedLocalFolderId == null && _selectedFolderId != null) {
+            final match = folderService.folders
+                .where((f) => f.id == _selectedFolderId)
+                .firstOrNull;
+            if (match != null) {
+              _selectedLocalFolderId = match.localId;
+            }
+          }
           final folders = folderService.folders.where((f) => f.syncStatus != 'deleted').toList();
           final idToLocalId = <int, String>{for (final f in folders) if (f.id != null) f.id!: f.localId};
           final childrenMap = <String?, List<Folder>>{};
@@ -305,14 +337,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             }
           }
 
-          List<Widget> buildFolderTree(List<Folder> items) {
+          List<Widget> buildFolderTree(List<Folder> items, {int depth = 0}) {
+            final leftPadding = 16.0 + depth * 24.0;
             return items.map((folder) {
               final children = childrenMap[folder.localId] ?? const <Folder>[];
-              final addBtn = IconButton(
-                icon: const Icon(Icons.add, size: 18),
-                tooltip: '新建子文件夹',
-                onPressed: () => addSubFolder(folder),
-              );
+              final hasChildren = children.isNotEmpty;
+              final isExpanded = expandedFolders.contains(folder.localId);
+              final isSelected = _selectedLocalFolderId == folder.localId;
+
               void selectFolder() {
                 setState(() {
                   _selectedFolderId = folder.id;
@@ -320,21 +352,62 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 });
                 Navigator.pop(ctx);
               }
-              if (children.isEmpty) {
-                return ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.folder, size: 20),
-                  title: Text(folder.name),
-                  selected: _selectedFolderId == folder.id,
-                  trailing: addBtn,
-                  onTap: selectFolder,
-                );
-              }
-              return ExpansionTile(
-                leading: const Icon(Icons.folder, size: 20),
-                title: Text(folder.name),
-                trailing: addBtn,
-                children: buildFolderTree(children),
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: selectFolder,
+                    child: Padding(
+                      padding: EdgeInsets.only(left: leftPadding, right: 8, top: 8, bottom: 8),
+                      child: Row(
+                        children: [
+                          if (hasChildren)
+                            GestureDetector(
+                              onTap: () {
+                                setSheetState(() {
+                                  if (isExpanded) {
+                                    expandedFolders.remove(folder.localId);
+                                  } else {
+                                    expandedFolders.add(folder.localId);
+                                  }
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
+                                  size: 20,
+                                ),
+                              ),
+                            )
+                          else
+                            const SizedBox(width: 28),
+                          const Icon(Icons.folder, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              folder.name,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(Icons.check, size: 18, color: Theme.of(context).colorScheme.primary),
+                          IconButton(
+                            icon: const Icon(Icons.add, size: 18),
+                            tooltip: '新建子文件夹',
+                            onPressed: () => addSubFolder(folder),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (hasChildren && isExpanded)
+                    ...buildFolderTree(children, depth: depth + 1),
+                ],
               );
             }).toList();
           }
@@ -363,7 +436,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                           dense: true,
                           leading: const Icon(Icons.folder_off, size: 20),
                           title: const Text('无文件夹'),
-                          selected: _selectedFolderId == null && _selectedLocalFolderId == null,
+                          selected: _selectedLocalFolderId == null,
                           onTap: () {
                             setState(() {
                               _selectedFolderId = null;
@@ -413,18 +486,26 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         },
       ),
     );
+
+    if (_selectedLocalFolderId != prevLocalFolderId && mounted) {
+      _autoSave();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final title = _title.isEmpty ? (_currentNote != null ? '未命名' : '新建笔记') : _title;
     final folders = context.watch<LocalFolderService>().folders.where((f) => f.syncStatus != 'deleted').toList();
-    final selectedFolder = _selectedFolderId != null
-        ? folders.where((f) => f.id == _selectedFolderId).firstOrNull
+    final selectedFolder = _selectedLocalFolderId != null
+        ? folders.where((f) => f.localId == _selectedLocalFolderId).firstOrNull
         : null;
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: _close,
+        ),
         title: InkWell(
           onTap: _editTitle,
           child: Align(
@@ -500,6 +581,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 placeholder: '开始写点什么...',
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 embedBuilders: [NoteImageEmbedBuilder()],
+                autoFocus: true,
+                expands: true,
+                enableInteractiveSelection: true,
               ),
             ),
           ),

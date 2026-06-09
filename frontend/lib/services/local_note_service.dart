@@ -79,7 +79,11 @@ class LocalNoteService extends ChangeNotifier {
     await ensureLoaded();
     final i = _notes.indexWhere((n) => n.id != null && n.id == remote.id);
     if (i != -1) {
-      _notes[i] = remote.copyWith(localId: _notes[i].localId);
+      final existing = _notes[i];
+      _notes[i] = remote.copyWith(
+        localId: existing.localId,
+        localFolderId: existing.localFolderId != null ? () => existing.localFolderId : null,
+      );
     } else {
       _notes.insert(0, remote);
     }

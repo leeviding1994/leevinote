@@ -77,7 +77,11 @@ class LocalFolderService extends ChangeNotifier {
     await ensureLoaded();
     final i = _folders.indexWhere((f) => f.id != null && f.id == remote.id);
     if (i != -1) {
-      _folders[i] = remote.copyWith(localId: _folders[i].localId);
+      final existing = _folders[i];
+      _folders[i] = remote.copyWith(
+        localId: existing.localId,
+        localParentId: existing.localParentId != null ? () => existing.localParentId : null,
+      );
     } else {
       _folders.add(remote);
     }
