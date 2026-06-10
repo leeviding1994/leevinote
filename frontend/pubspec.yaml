@@ -46,6 +46,7 @@ dependencies:
 
   # Navigation
   go_router: ^13.0.1
+  lunar: ^1.7.8
 
 dev_dependencies:
   flutter_test:

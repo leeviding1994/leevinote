@@ -37,6 +37,25 @@ class ScheduleService extends ChangeNotifier {
     }).toList();
   }
 
+  List<Schedule> searchSchedules({String? query, DateTime? startDate, DateTime? endDate}) {
+    return _schedules.where((s) {
+      if (s.syncStatus == 'deleted') return false;
+      if (query != null && query.isNotEmpty) {
+        final q = query.toLowerCase();
+        if (!s.title.toLowerCase().contains(q)) return false;
+      }
+      if (startDate != null) {
+        final start = DateTime(startDate.year, startDate.month, startDate.day);
+        if (s.endTime.isBefore(start)) return false;
+      }
+      if (endDate != null) {
+        final end = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+        if (s.startTime.isAfter(end)) return false;
+      }
+      return true;
+    }).toList();
+  }
+
   Future<void> load() async {
     _loading = true;
     notifyListeners();

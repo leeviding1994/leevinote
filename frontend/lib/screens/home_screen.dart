@@ -47,9 +47,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: _currentIndex == 0 && _notesKey.currentState != null
-            ? _notesKey.currentState!.buildBreadcrumbWidget()
-            : Text(_titles[_currentIndex]),
+        title: _currentIndex == 4
+            ? GestureDetector(
+                onTap: () => _schedulesKey.currentState?.resetToDayView(),
+                child: Text(_titles[_currentIndex]),
+              )
+            : (_currentIndex == 0 && _notesKey.currentState != null
+                ? _notesKey.currentState!.buildBreadcrumbWidget()
+                : Text(_titles[_currentIndex])),
         actions: [
           if (_currentIndex == 0)
             IconButton(
@@ -74,6 +79,12 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.sync),
               tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
               onPressed: () => _videosKey.currentState?.sync(),
+            ),
+          if (_currentIndex == 4)
+            IconButton(
+              icon: const Icon(Icons.search),
+              tooltip: '搜索日程',
+              onPressed: () => _schedulesKey.currentState?.toggleSearch(),
             ),
           if (_currentIndex == 4)
             IconButton(
