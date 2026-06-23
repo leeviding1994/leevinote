@@ -10,6 +10,7 @@ class Schedule {
   final DateTime startTime;
   final DateTime endTime;
   final String? location;
+  final bool completed;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String syncStatus;
@@ -22,6 +23,7 @@ class Schedule {
     required this.startTime,
     required this.endTime,
     this.location,
+    this.completed = false,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.syncStatus = 'local',
@@ -37,6 +39,7 @@ class Schedule {
     DateTime? startTime,
     DateTime? endTime,
     String? location,
+    bool? completed,
     DateTime? updatedAt,
     String? syncStatus,
   }) {
@@ -48,6 +51,7 @@ class Schedule {
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       location: location ?? this.location,
+      completed: completed ?? this.completed,
       createdAt: createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       syncStatus: syncStatus ?? this.syncStatus,
@@ -63,6 +67,7 @@ class Schedule {
       startTime: DateTime.parse(json['start_time']),
       endTime: DateTime.parse(json['end_time']),
       location: json['location'],
+      completed: json['completed'] == true,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -82,6 +87,7 @@ class Schedule {
       'start_time': startTime.toIso8601String(),
       'end_time': endTime.toIso8601String(),
       'location': location,
+      'completed': completed,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'sync_status': syncStatus,
@@ -96,6 +102,7 @@ class Schedule {
       'start_time': startTime.toIso8601String(),
       'end_time': endTime.toIso8601String(),
       'location': location,
+      'completed': completed,
     };
   }
 }

@@ -48,6 +48,14 @@ dependencies:
   go_router: ^13.0.1
   lunar: ^1.7.8
 
+  # Desktop Window Management
+  window_manager: ^0.3.8
+
+  # Local Database
+  sqflite: ^2.3.2
+  sqflite_common_ffi: ^2.4.0+3
+  path: ^1.8.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

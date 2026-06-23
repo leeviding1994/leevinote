@@ -23,6 +23,9 @@ public class Schedule extends BaseEntity {
 
     private String location;
 
+    @Column(name = "completed")
+    private Boolean completed = false;
+
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

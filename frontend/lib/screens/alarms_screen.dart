@@ -56,7 +56,8 @@ class AlarmsScreenState extends State<AlarmsScreen> {
               ? _buildEmptyState()
               : _buildAlarmList(alarmService),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddAlarmSheet(context),
+        heroTag: 'alarms_fab',
+        onPressed: () => _showAlarmEditor(context),
         child: const Icon(Icons.add_alarm),
       ),
     );
@@ -67,20 +68,11 @@ class AlarmsScreenState extends State<AlarmsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          GestureDetector(
-            onLongPress: () => _showDiagnosticDialog(context),
-            child: const Icon(Icons.alarm_add, size: 64, color: Colors.grey),
-          ),
+          const Icon(Icons.alarm_add, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
           const Text('暂无闹钟', style: TextStyle(color: Colors.grey, fontSize: 16)),
           const SizedBox(height: 8),
           const Text('点击右下角按钮添加', style: TextStyle(color: Colors.grey, fontSize: 14)),
-          const SizedBox(height: 24),
-          TextButton.icon(
-            onPressed: () => _showDiagnosticDialog(context),
-            icon: const Icon(Icons.bug_report, size: 18),
-            label: const Text('闹钟不响？点此诊断'),
-          ),
         ],
       ),
     );
@@ -99,7 +91,6 @@ class AlarmsScreenState extends State<AlarmsScreen> {
 
   Widget _buildAlarmCard(Alarm alarm, AlarmService service) {
     final timeStr = DateFormat('HH:mm').format(alarm.alarmTime);
-    final dateStr = DateFormat('M月d日').format(alarm.alarmTime);
     final repeatText = alarm.repeatPattern ?? '单次';
 
     return Card(
@@ -107,250 +98,297 @@ class AlarmsScreenState extends State<AlarmsScreen> {
       elevation: alarm.enabled ? 1 : 0,
       child: Opacity(
         opacity: alarm.enabled ? 1.0 : 0.5,
-        child: ListTile(
-          leading: GestureDetector(
-            onLongPress: () => _showDiagnosticDialog(context),
-            child: CircleAvatar(
-              backgroundColor: alarm.enabled
-                  ? Theme.of(context).colorScheme.primaryContainer
-                  : Colors.grey.shade200,
-              child: Icon(
-                alarm.enabled ? Icons.alarm : Icons.alarm_off,
-                color: alarm.enabled
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.grey,
-              ),
-            ),
-          ),
-          title: Text(
-            alarm.title,
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
-          subtitle: Text('$dateStr  $timeStr  ·  $repeatText'),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Switch(
-                value: alarm.enabled,
-                onChanged: (_) => service.toggleAlarm(alarm),
-              ),
-              IconButton(
-                icon: const Icon(Icons.play_circle_outline, size: 20),
-                tooltip: '立即测试',
-                onPressed: () async {
-                  final err = await service.triggerAlarmNow(alarm);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(err ?? '🕐 5 秒后触发"${alarm.title}"'),
-                        behavior: SnackBarBehavior.floating,
+        child: InkWell(
+          onTap: () => _showAlarmEditor(context, alarm: alarm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                // 时间显示
+                SizedBox(
+                  width: 72,
+                  child: Text(
+                    timeStr,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: alarm.enabled
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.grey,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // 标题和重复信息
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        alarm.title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        repeatText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // 开关（阻止事件冒泡）
+                Switch(
+                  value: alarm.enabled,
+                  onChanged: (_) => service.toggleAlarm(alarm),
+                ),
+                // 删除按钮（阻止事件冒泡）
+                GestureDetector(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('删除闹钟'),
+                        content: Text('确定删除"${alarm.title}"吗？'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('取消'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              service.deleteAlarm(alarm.localId);
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('确定',
+                                style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
                       ),
                     );
-                  }
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('删除闹钟'),
-                      content: Text('确定删除"${alarm.title}"吗？'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('取消'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            service.deleteAlarm(alarm.localId);
-                            Navigator.pop(ctx);
-                          },
-                          child: const Text('确定',
-                              style: TextStyle(color: Colors.red)),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.delete_outline, size: 20),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  void _showAddAlarmSheet(BuildContext context) {
-    final titleC = TextEditingController();
-    final descC = TextEditingController();
-    TimeOfDay selectedTime = TimeOfDay.now();
-    DateTime selectedDate = DateTime.now();
-    String? repeatPattern;
+  void _showAlarmEditor(BuildContext context, {Alarm? alarm}) {
+    final isEditing = alarm != null;
+    final titleC = TextEditingController(text: isEditing ? alarm.title : '');
+    int selectedHour = isEditing ? alarm.alarmTime.hour : TimeOfDay.now().hour;
+    int selectedMinute = isEditing ? alarm.alarmTime.minute : TimeOfDay.now().minute;
+    String? repeatPattern = isEditing ? alarm.repeatPattern : null;
+    final weekDays = isEditing ? List<int>.from(alarm.weekDays) : <int>[];
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      barrierDismissible: true,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                left: 20,
-                right: 20,
-                top: 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '添加闹钟',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: titleC,
-                    decoration: const InputDecoration(
-                      labelText: '闹钟标题',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.title),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: descC,
-                    decoration: const InputDecoration(
-                      labelText: '备注（可选）',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.description),
-                    ),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () async {
-                            final date = await showDatePicker(
-                              context: ctx,
-                              initialDate: selectedDate,
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now()
-                                  .add(const Duration(days: 365)),
-                            );
-                            if (date != null) {
-                              setSheetState(() => selectedDate = date);
-                            }
-                          },
-                          child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: '日期',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.calendar_today),
-                            ),
-                            child: Text(DateFormat('M月d日').format(selectedDate)),
+            return Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                child: Material(
+                  borderRadius: BorderRadius.circular(16),
+                  elevation: 8,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isEditing ? '编辑闹钟' : '添加闹钟',
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 20),
+                        TextField(
+                          controller: titleC,
+                          decoration: const InputDecoration(
+                            labelText: '闹钟标题',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.title),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () async {
-                            final time = await showTimePicker(
-                              context: ctx,
-                              initialTime: selectedTime,
-                            );
-                            if (time != null) {
-                              setSheetState(() => selectedTime = time);
-                            }
-                          },
-                          child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: '时间',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.access_time),
-                            ),
-                            child: Text(selectedTime.format(context)),
+                        const SizedBox(height: 16),
+                        // 时间直接显示滚轮选择器
+                        SizedBox(
+                          height: 180,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: ListWheelScrollView.useDelegate(
+                                  itemExtent: 40,
+                                  onSelectedItemChanged: (index) {
+                                    setSheetState(() => selectedHour = index);
+                                  },
+                                  controller: FixedExtentScrollController(initialItem: selectedHour),
+                                  childDelegate: ListWheelChildBuilderDelegate(
+                                    builder: (context, index) {
+                                      if (index < 0 || index >= 24) return null;
+                                      return Center(
+                                        child: Text(
+                                          index.toString().padLeft(2, '0'),
+                                          style: TextStyle(
+                                            fontSize: 22,
+                                            fontWeight: selectedHour == index ? FontWeight.bold : FontWeight.normal,
+                                            color: selectedHour == index ? Theme.of(context).colorScheme.primary : Colors.grey,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    childCount: 24,
+                                  ),
+                                ),
+                              ),
+                              const Text(':', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                              Expanded(
+                                child: ListWheelScrollView.useDelegate(
+                                  itemExtent: 40,
+                                  onSelectedItemChanged: (index) {
+                                    setSheetState(() => selectedMinute = index);
+                                  },
+                                  controller: FixedExtentScrollController(initialItem: selectedMinute),
+                                  childDelegate: ListWheelChildBuilderDelegate(
+                                    builder: (context, index) {
+                                      if (index < 0 || index >= 60) return null;
+                                      return Center(
+                                        child: Text(
+                                          index.toString().padLeft(2, '0'),
+                                          style: TextStyle(
+                                            fontSize: 22,
+                                            fontWeight: selectedMinute == index ? FontWeight.bold : FontWeight.normal,
+                                            color: selectedMinute == index ? Theme.of(context).colorScheme.primary : Colors.grey,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    childCount: 60,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: repeatPattern,
-                    decoration: const InputDecoration(
-                      labelText: '重复',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.repeat),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: null, child: Text('单次')),
-                      DropdownMenuItem(value: '每天', child: Text('每天')),
-                      DropdownMenuItem(value: '每周', child: Text('每周')),
-                      DropdownMenuItem(value: '每月', child: Text('每月')),
-                      DropdownMenuItem(
-                          value: '工作日', child: Text('工作日（周一至周五）')),
-                    ],
-                    onChanged: (v) =>
-                        setSheetState(() => repeatPattern = v),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        if (titleC.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('请输入闹钟标题')),
-                          );
-                          return;
-                        }
-                        final alarm = Alarm(
-                          title: titleC.text.trim(),
-                          description: descC.text.trim().isEmpty
-                              ? null
-                              : descC.text.trim(),
-                          alarmTime: DateTime(
-                            selectedDate.year,
-                            selectedDate.month,
-                            selectedDate.day,
-                            selectedTime.hour,
-                            selectedTime.minute,
+                        const SizedBox(height: 16),
+                        const Text('重复类型', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            for (final type in ['单次', '节假日', '工作日', '自定义'])
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                                  child: OutlinedButton(
+                                    onPressed: () => setSheetState(() => repeatPattern = type),
+                                    style: OutlinedButton.styleFrom(
+                                      backgroundColor: repeatPattern == type
+                                          ? Theme.of(context).colorScheme.primary
+                                          : null,
+                                      foregroundColor: repeatPattern == type
+                                          ? Colors.white
+                                          : null,
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    child: Text(type, style: const TextStyle(fontSize: 12)),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (repeatPattern == '自定义')
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Wrap(
+                              spacing: 8,
+                              children: [
+                                for (int i = 1; i <= 7; i++)
+                                  FilterChip(
+                                    label: Text({1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五', 6: '周六', 7: '周日'}[i]!),
+                                    selected: weekDays.contains(i),
+                                    onSelected: (selected) {
+                                      setSheetState(() {
+                                        if (selected) {
+                                          weekDays.add(i);
+                                        } else {
+                                          weekDays.remove(i);
+                                        }
+                                      });
+                                    },
+                                  ),
+                              ],
+                            ),
                           ),
-                          enabled: true,
-                          repeatPattern: repeatPattern,
-                        );
-                        context.read<AlarmService>().createAlarm(alarm);
-                        Navigator.pop(ctx);
-                      },
-                      icon: const Icon(Icons.check),
-                      label: const Text('添加闹钟'),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              if (titleC.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('请输入闹钟标题')),
+                                );
+                                return;
+                              }
+                              if (repeatPattern == '自定义' && weekDays.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('请选择至少一天')),
+                                );
+                                return;
+                              }
+                              final alarmTime = DateTime(
+                                DateTime.now().year,
+                                DateTime.now().month,
+                                DateTime.now().day,
+                                selectedHour,
+                                selectedMinute,
+                              );
+                              if (isEditing) {
+                                final updated = alarm.copyWith(
+                                  title: titleC.text.trim(),
+                                  alarmTime: alarmTime,
+                                  repeatPattern: repeatPattern,
+                                  weekDays: weekDays,
+                                );
+                                context.read<AlarmService>().updateAlarm(updated);
+                              } else {
+                                final newAlarm = Alarm(
+                                  title: titleC.text.trim(),
+                                  alarmTime: alarmTime,
+                                  enabled: true,
+                                  repeatPattern: repeatPattern,
+                                  weekDays: weekDays,
+                                );
+                                context.read<AlarmService>().createAlarm(newAlarm);
+                              }
+                              Navigator.pop(ctx);
+                            },
+                            icon: const Icon(Icons.check),
+                            label: Text(isEditing ? '保存闹钟' : '添加闹钟'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(height: MediaQuery.of(ctx).viewInsets.bottom > 0
-                      ? 0
-                      : 20),
-                ],
+                ),
               ),
             );
           },
@@ -359,115 +397,4 @@ class AlarmsScreenState extends State<AlarmsScreen> {
     );
   }
 
-  void _showDiagnosticDialog(BuildContext context) {
-    final service = context.read<AlarmService>();
-    String testResult = '';
-    String pendingInfo = '';
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.bug_report, size: 24),
-            SizedBox(width: 8),
-            Text('闹钟诊断'),
-          ],
-        ),
-        content: StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _diagRow('通知插件已初始化', service.initialized),
-                  const SizedBox(height: 12),
-                  if (testResult.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(testResult,
-                          style: TextStyle(
-                              color: testResult.contains('失败')
-                                  ? Colors.red
-                                  : Colors.green)),
-                    ),
-                  if (pendingInfo.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(pendingInfo, style: const TextStyle(fontSize: 13)),
-                    ),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final err = await service.sendTestNotification();
-                        setDialogState(() {
-                          testResult = err ?? '✅ 测试通知已发送，请查看手机通知栏';
-                        });
-                      },
-                      icon: const Icon(Icons.notifications_active),
-                      label: const Text('1. 发送测试通知'),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final err = await service.rescheduleAll();
-                        setDialogState(() {
-                          testResult = err ?? '✅ 已重新调度所有闹钟';
-                        });
-                      },
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('2. 重新调度所有闹钟'),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final pending = await service.getPendingNotifications();
-                        setDialogState(() {
-                          if (pending.isEmpty) {
-                            pendingInfo = '⚠️ 没有待触发的通知 — 闹钟未被调度';
-                          } else {
-                            pendingInfo = '待触发通知 (${pending.length}个):\n';
-                            for (final p in pending) {
-                              pendingInfo += '  · ID $p\n';
-                            }
-                          }
-                        });
-                      },
-                      icon: const Icon(Icons.list),
-                      label: const Text('3. 查看待触发通知列表'),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _diagRow(String label, bool ok) {
-    return Row(
-      children: [
-        Icon(ok ? Icons.check_circle : Icons.error,
-            size: 18, color: ok ? Colors.green : Colors.red),
-        const SizedBox(width: 8),
-        Text(label, style: const TextStyle(fontSize: 14)),
-      ],
-    );
-  }
 }

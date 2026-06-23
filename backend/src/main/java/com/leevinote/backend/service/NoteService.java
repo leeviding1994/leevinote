@@ -12,7 +12,7 @@ public class NoteService {
     private final NoteRepository noteRepository;
 
     public List<Note> getNotesByUser(Long userId) {
-        return noteRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        return noteRepository.findByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(userId);
     }
 
     public Note createNote(Note note) {
@@ -30,6 +30,9 @@ public class NoteService {
     }
 
     public void deleteNote(Long id) {
-        noteRepository.deleteById(id);
+        Note note = noteRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Note not found: " + id));
+        note.setIsDeleted(true);
+        noteRepository.save(note);
     }
 }

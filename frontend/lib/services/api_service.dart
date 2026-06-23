@@ -124,6 +124,15 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> patch(String path, {Map<String, dynamic>? data}) async {
+    try {
+      final response = await _dio.patch(path, data: data != null ? jsonEncode(data) : null);
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   String _handleError(DioException e) {
     if (e.response != null) {
       final data = e.response?.data;

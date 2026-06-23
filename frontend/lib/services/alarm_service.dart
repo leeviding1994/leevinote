@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:leevinote/models/alarm.dart';
 import 'package:leevinote/services/api_service.dart';
 import 'package:leevinote/services/local_alarm_service.dart';
+import 'package:leevinote/services/holiday_service.dart';
 import 'package:leevinote/utils/constants.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -10,13 +11,19 @@ import 'package:timezone/data/latest.dart' as tz_data;
 class AlarmService extends ChangeNotifier {
   final ApiService _api;
   final LocalAlarmService _local;
+  HolidayService? _holidayService;
   List<Alarm> _alarms = [];
   bool _loading = false;
   bool _syncing = false;
   FlutterLocalNotificationsPlugin? _notificationsPlugin;
   bool _initialized = false;
 
-  AlarmService(this._api, this._local);
+  AlarmService(this._api, this._local, {HolidayService? holidayService})
+      : _holidayService = holidayService;
+
+  void setHolidayService(HolidayService service) {
+    _holidayService = service;
+  }
 
   List<Alarm> get alarms => _alarms;
   bool get loading => _loading;
@@ -167,6 +174,20 @@ class AlarmService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateAlarm(Alarm alarm) async {
+    final updated = alarm.copyWith(
+      syncStatus: alarm.id != null ? 'modified' : 'local',
+    );
+    await _local.updateAlarm(updated);
+    final index = _alarms.indexWhere((a) => a.localId == alarm.localId);
+    if (index != -1) _alarms[index] = updated;
+    notifyListeners();
+    if (_initialized && updated.enabled) {
+      await _notificationsPlugin?.cancel(id: _notificationId(updated));
+      await _scheduleNotification(updated);
+    }
+  }
+
   Future<void> toggleAlarm(Alarm alarm) async {
     final updated = alarm.copyWith(
       enabled: !alarm.enabled,
@@ -236,139 +257,6 @@ class AlarmService extends ChangeNotifier {
     }
   }
 
-  /// 发送一条立即通知，用于诊断通知渠道是否正常工作
-  Future<String?> sendTestNotification() async {
-    if (_notificationsPlugin == null) return '通知插件未初始化';
-    try {
-      const androidDetails = AndroidNotificationDetails(
-        'alarm_channel_v2',
-        '闹钟提醒',
-        channelDescription: '闹钟提醒通知',
-        importance: Importance.max,
-        priority: Priority.high,
-        category: AndroidNotificationCategory.alarm,
-        visibility: NotificationVisibility.public,
-        fullScreenIntent: true,
-        playSound: true,
-        enableVibration: true,
-      );
-      const iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      );
-      const details = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-      await _notificationsPlugin!.show(
-        id: -1,
-        title: '测试通知',
-        body: '如果你看到这条通知，说明通知渠道是正常的',
-        notificationDetails: details,
-      );
-      return null; // success
-    } catch (e) {
-      return '发送测试通知失败: $e';
-    }
-  }
-
-  /// 返回当前待触发的所有通知（用于诊断）
-  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
-    if (_notificationsPlugin == null) return [];
-    try {
-      return await _notificationsPlugin!.pendingNotificationRequests();
-    } catch (e) {
-      debugPrint('获取待触发通知失败: $e');
-      return [];
-    }
-  }
-
-  /// 重新调度所有已启用的闹钟（用于诊断/修复）
-  Future<String?> rescheduleAll() async {
-    if (_notificationsPlugin == null) return '通知插件未初始化';
-    try {
-      for (final alarm in _alarms.where((a) => a.enabled)) {
-        await _scheduleNotification(alarm);
-      }
-      return null;
-    } catch (e) {
-      return '重新调度失败: $e';
-    }
-  }
-
-  /// 立即触发指定闹钟（用于测试）
-  /// 优先使用 zonedSchedule 在 5 秒后触发；若精确闹钟权限未授予，
-  /// 则立即发送一条通知（show），避免 inexactAllowWhileIdle 被系统延迟 9 分钟。
-  Future<String?> triggerAlarmNow(Alarm alarm) async {
-    if (_notificationsPlugin == null) return '通知插件未初始化';
-    try {
-      // 取消原有调度
-      await _notificationsPlugin!.cancel(id: _notificationId(alarm));
-
-      const androidDetails = AndroidNotificationDetails(
-        'alarm_channel_v2',
-        '闹钟提醒',
-        channelDescription: '闹钟提醒通知',
-        importance: Importance.max,
-        priority: Priority.high,
-        category: AndroidNotificationCategory.alarm,
-        visibility: NotificationVisibility.public,
-        fullScreenIntent: true,
-        playSound: true,
-        enableVibration: true,
-      );
-      const iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      );
-      const details = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-
-      // 先立即发送一条通知，确认渠道和权限正常
-      await _notificationsPlugin!.show(
-        id: _notificationId(alarm),
-        title: alarm.title,
-        body: '测试触发 — 原定 ${alarm.alarmTime.hour}:${alarm.alarmTime.minute.toString().padLeft(2, '0')}',
-        notificationDetails: details,
-      );
-
-      final now = tz.TZDateTime.now(tz.local);
-      final trigger = now.add(const Duration(seconds: 5));
-
-      const modes = [
-        AndroidScheduleMode.alarmClock,
-        AndroidScheduleMode.exactAllowWhileIdle,
-      ];
-      for (final mode in modes) {
-        try {
-          await _notificationsPlugin!.zonedSchedule(
-            id: _notificationId(alarm),
-            title: alarm.title,
-            body: '测试触发 — 原定 ${alarm.alarmTime.hour}:${alarm.alarmTime.minute.toString().padLeft(2, '0')}',
-            scheduledDate: trigger,
-            notificationDetails: details,
-            androidScheduleMode: mode,
-          );
-          // 5 秒后重新恢复原调度
-          Future.delayed(const Duration(seconds: 6), () {
-            _scheduleNotification(alarm);
-          });
-          return null; // success
-        } catch (e) {
-          debugPrint('triggerAlarmNow $mode 调度失败: $e');
-        }
-      }
-
-      return '已立即显示通知，但 5 秒后定时调度失败（请检查系统设置中是否允许精确闹钟）。';
-    } catch (e) {
-      return '触发失败: $e';
-    }
-  }
-
   Future<void> _scheduleNotification(Alarm alarm) async {
     if (_notificationsPlugin == null || !alarm.enabled) return;
 
@@ -394,33 +282,77 @@ class AlarmService extends ChangeNotifier {
       iOS: iosDetails,
     );
 
-    final scheduledDate = tz.TZDateTime.from(alarm.alarmTime, tz.local);
-    final now = tz.TZDateTime.now(tz.local);
-    debugPrint('闹钟 "${alarm.title}" 原始时间: $scheduledDate, 当前时间: $now');
-
-    if (scheduledDate.isBefore(now)) {
-      if (alarm.repeatPattern != null) {
-        // 重复闹钟：调到明天同一时间
-        final tomorrow = scheduledDate.add(const Duration(days: 1));
-        debugPrint('闹钟 "${alarm.title}" 时间已过，重复闹钟调至明天: $tomorrow');
-        await _zonedScheduleWithFallback(alarm, tomorrow, details);
-      } else {
-        // 单次闹钟：如果时间已过但在 2 分钟内（用户刚点击保存），仍然允许调度
-        // 否则调到明天同一时间
-        final diff = now.difference(scheduledDate);
-        if (diff.inMinutes <= 2) {
-          debugPrint('闹钟 "${alarm.title}" 时间已过 ${diff.inSeconds}s，仍在容错范围内，立即调度');
-          await _zonedScheduleWithFallback(alarm, now.add(const Duration(seconds: 2)), details);
-        } else {
-          final tomorrow = scheduledDate.add(const Duration(days: 1));
-          debugPrint('闹钟 "${alarm.title}" 时间已过 ${diff.inMinutes}m，单次闹钟调至明天: $tomorrow');
-          await _zonedScheduleWithFallback(alarm, tomorrow, details);
-        }
-      }
+    // 计算下一个触发时间
+    final nextDate = _calculateNextTriggerDate(alarm);
+    if (nextDate == null) {
+      debugPrint('闹钟 "${alarm.title}" 无法计算下一个触发时间，自动禁用');
+      final updated = alarm.copyWith(enabled: false, syncStatus: alarm.id != null ? 'modified' : 'local');
+      await _local.updateAlarm(updated);
+      final index = _alarms.indexWhere((a) => a.localId == alarm.localId);
+      if (index != -1) _alarms[index] = updated;
+      notifyListeners();
       return;
     }
 
-    await _zonedScheduleWithFallback(alarm, scheduledDate, details);
+    final now = tz.TZDateTime.now(tz.local);
+    debugPrint('闹钟 "${alarm.title}" 下次触发: $nextDate, 当前时间: $now');
+    await _zonedScheduleWithFallback(alarm, nextDate, details);
+  }
+
+  tz.TZDateTime? _calculateNextTriggerDate(Alarm alarm) {
+    final now = tz.TZDateTime.now(tz.local);
+    final baseTime = tz.TZDateTime.from(alarm.alarmTime, tz.local);
+    final today = tz.TZDateTime.from(DateTime(now.year, now.month, now.day, baseTime.hour, baseTime.minute), tz.local);
+
+    switch (alarm.repeatPattern) {
+      case '单次':
+        // 如果今天时间已过，则明天触发
+        if (today.isBefore(now)) {
+          return today.add(const Duration(days: 1));
+        }
+        return today;
+      case '节假日':
+        // 节假日：需要检查是否是节假日
+        if (_holidayService == null) return null;
+        // 从明天开始查找下一个节假日
+        for (int i = 1; i <= 365; i++) {
+          final date = today.add(Duration(days: i));
+          if (_holidayService!.isHoliday(date)) {
+            return date;
+          }
+        }
+        return null;
+      case '工作日':
+        // 工作日：周一到周五
+        for (int i = 0; i <= 7; i++) {
+          final date = today.add(Duration(days: i));
+          if (date.weekday >= DateTime.monday && date.weekday <= DateTime.friday) {
+            if (date.isAfter(now) || (i == 0 && !today.isBefore(now))) {
+              return date;
+            }
+          }
+        }
+        return null;
+      case '自定义':
+        // 自定义周几
+        if (alarm.weekDays.isEmpty) return null;
+        for (int i = 0; i <= 7; i++) {
+          final date = today.add(Duration(days: i));
+          // weekday: 1=Monday, 7=Sunday
+          if (alarm.weekDays.contains(date.weekday)) {
+            if (date.isAfter(now) || (i == 0 && !today.isBefore(now))) {
+              return date;
+            }
+          }
+        }
+        return null;
+      default:
+        // 兼容旧的 null 单次闹钟
+        if (today.isBefore(now)) {
+          return today.add(const Duration(days: 1));
+        }
+        return today;
+    }
   }
 
   /// 使用 alarmClock 调度（AlarmManager.setAlarmClock）。

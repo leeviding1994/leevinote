@@ -57,6 +57,7 @@ class VideosScreenState extends State<VideosScreen> {
               ? _buildEmptyState()
               : _buildVideoList(videoService),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'videos_fab',
         onPressed: () => _pickAndAddVideo(context),
         child: const Icon(Icons.add),
       ),

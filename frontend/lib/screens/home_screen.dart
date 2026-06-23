@@ -6,7 +6,10 @@ import 'package:leevinote/screens/alarms_screen.dart';
 import 'package:leevinote/screens/music_screen.dart';
 import 'package:leevinote/screens/videos_screen.dart';
 import 'package:leevinote/screens/schedules_screen.dart';
+import 'package:leevinote/screens/profile_screen.dart';
+import 'package:leevinote/screens/settings_screen.dart';
 import 'package:leevinote/services/auth_service.dart';
+import 'package:leevinote/services/settings_service.dart';
 import 'package:leevinote/services/local_folder_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -33,80 +36,113 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  final List<String> _titles = [
-    '笔记',
-    '闹钟',
-    '音乐',
-    '视频',
-    '日程',
-  ];
-
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
+    final settings = context.watch<SettingsService>();
+    final modules = settings.modules;
+    final ids = modules.map((m) => m.id).toList();
+
+    // 如果当前索引越界（如隐藏了当前模块），重置到第一个
+    if (_currentIndex >= ids.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _currentIndex = 0);
+      });
+    }
+    // 根据 moduleOrder 确定当前选中模块的索引
+    final selectedModuleId = ids.isNotEmpty ? ids[_currentIndex] : 'notes';
+    final isNotes = selectedModuleId == 'notes';
+    final isSchedules = selectedModuleId == 'schedules';
+    final isProfile = selectedModuleId == 'profile';
+
+    // 构建标题
+    final title = isNotes && _notesKey.currentState != null
+        ? _notesKey.currentState!.buildBreadcrumbWidget()
+        : isSchedules
+            ? GestureDetector(
+                onTap: () => _schedulesKey.currentState?.resetToDayView(),
+                child: Text(modules[_currentIndex].label),
+              )
+            : Text(modules[_currentIndex].label);
+
+    // 构建 actions
+    final actions = <Widget>[];
+    if (isNotes) {
+      actions.add(IconButton(
+        icon: const Icon(Icons.sync),
+        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+        onPressed: () => _notesKey.currentState?.sync(),
+      ));
+    }
+    if (isSchedules) {
+      actions.add(IconButton(
+        icon: const Icon(Icons.search),
+        tooltip: '搜索日程',
+        onPressed: () => _schedulesKey.currentState?.toggleSearch(),
+      ));
+      actions.add(IconButton(
+        icon: const Icon(Icons.sync),
+        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+        onPressed: () => _schedulesKey.currentState?.sync(),
+      ));
+    }
+    if (isProfile) {
+      actions.add(IconButton(
+        icon: const Icon(Icons.settings_outlined),
+        tooltip: '设置',
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+        ),
+      ));
+    }
+    // 其他模块（闹钟、音乐、视频）的同步按钮
+    if (selectedModuleId == 'alarms') {
+      actions.add(IconButton(
+        icon: const Icon(Icons.sync),
+        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+        onPressed: () => _alarmsKey.currentState?.sync(),
+      ));
+    }
+    if (selectedModuleId == 'music') {
+      actions.add(IconButton(
+        icon: const Icon(Icons.sync),
+        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+        onPressed: () => _musicKey.currentState?.sync(),
+      ));
+    }
+    if (selectedModuleId == 'videos') {
+      actions.add(IconButton(
+        icon: const Icon(Icons.sync),
+        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+        onPressed: () => _videosKey.currentState?.sync(),
+      ));
+    }
+
+    // 构建 IndexedStack children
+    final widgetMap = {
+      'notes': NotesScreen(key: _notesKey),
+      'alarms': AlarmsScreen(key: _alarmsKey),
+      'music': MusicScreen(key: _musicKey),
+      'videos': VideosScreen(key: _videosKey),
+      'schedules': SchedulesScreen(key: _schedulesKey),
+      'profile': const ProfileScreen(),
+    };
+    final children = ids.map((id) => widgetMap[id]!).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: _currentIndex == 4
-            ? GestureDetector(
-                onTap: () => _schedulesKey.currentState?.resetToDayView(),
-                child: Text(_titles[_currentIndex]),
-              )
-            : (_currentIndex == 0 && _notesKey.currentState != null
-                ? _notesKey.currentState!.buildBreadcrumbWidget()
-                : Text(_titles[_currentIndex])),
-        actions: [
-          if (_currentIndex == 0)
-            IconButton(
-              icon: const Icon(Icons.sync),
-              tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-              onPressed: () => _notesKey.currentState?.sync(),
-            ),
-          if (_currentIndex == 1)
-            IconButton(
-              icon: const Icon(Icons.sync),
-              tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-              onPressed: () => _alarmsKey.currentState?.sync(),
-            ),
-          if (_currentIndex == 2)
-            IconButton(
-              icon: const Icon(Icons.sync),
-              tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-              onPressed: () => _musicKey.currentState?.sync(),
-            ),
-          if (_currentIndex == 3)
-            IconButton(
-              icon: const Icon(Icons.sync),
-              tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-              onPressed: () => _videosKey.currentState?.sync(),
-            ),
-          if (_currentIndex == 4)
-            IconButton(
-              icon: const Icon(Icons.search),
-              tooltip: '搜索日程',
-              onPressed: () => _schedulesKey.currentState?.toggleSearch(),
-            ),
-          if (_currentIndex == 4)
-            IconButton(
-              icon: const Icon(Icons.sync),
-              tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-              onPressed: () => _schedulesKey.currentState?.sync(),
-            ),
-        ],
+        title: title,
+        actions: actions,
       ),
-      drawer: _currentIndex == 0 ? _buildFolderDrawer() : null,
+      drawer: isNotes ? _buildFolderDrawer() : null,
       body: IndexedStack(
         index: _currentIndex,
-        children: [
-          NotesScreen(key: _notesKey),
-          AlarmsScreen(key: _alarmsKey),
-          MusicScreen(key: _musicKey),
-          VideosScreen(key: _videosKey),
-          SchedulesScreen(key: _schedulesKey),
-        ],
+        children: children,
       ),
-      floatingActionButton: _currentIndex == 0
+      floatingActionButton: isNotes
           ? FloatingActionButton(
+              heroTag: 'notes_fab',
               onPressed: () => _notesKey.currentState?.openEditor(
                 null,
                 defaultLocalFolderId: _notesKey.currentState?.selectedLocalFolderId,
@@ -121,13 +157,10 @@ class _HomeScreenState extends State<HomeScreen> {
             _currentIndex = index;
           });
         },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.note), label: '笔记'),
-          NavigationDestination(icon: Icon(Icons.alarm), label: '闹钟'),
-          NavigationDestination(icon: Icon(Icons.music_note), label: '音乐'),
-          NavigationDestination(icon: Icon(Icons.video_library), label: '视频'),
-          NavigationDestination(icon: Icon(Icons.calendar_today), label: '日程'),
-        ],
+        destinations: modules.map((m) => NavigationDestination(
+          icon: Icon(m.icon),
+          label: m.label,
+        )).toList(),
       ),
     );
   }

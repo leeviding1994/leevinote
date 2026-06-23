@@ -19,20 +19,29 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context, false),
+        ),
+        title: Text(_isLogin ? '登录' : '注册'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.note_alt,
-                size: 80,
-                color: Theme.of(context).colorScheme.primary,
+              Image.asset(
+                'assets/images/icon.png',
+                width: 80,
+                height: 80,
               ),
               const SizedBox(height: 32),
               Text(
-                'Leevinote',
+                'LeeviNote',
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),

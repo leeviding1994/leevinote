@@ -53,6 +53,20 @@ class LocalScheduleService extends ChangeNotifier {
     }
   }
 
+  Future<Schedule?> toggleCompleted(String localId) async {
+    await ensureLoaded();
+    final index = _schedules.indexWhere((s) => s.localId == localId);
+    if (index != -1) {
+      final schedule = _schedules[index];
+      final updated = schedule.copyWith(completed: !schedule.completed, syncStatus: 'modified');
+      _schedules[index] = updated;
+      await _persist();
+      notifyListeners();
+      return updated;
+    }
+    return null;
+  }
+
   Future<void> deleteSchedule(String localId) async {
     await ensureLoaded();
     _schedules.removeWhere((s) => s.localId == localId);

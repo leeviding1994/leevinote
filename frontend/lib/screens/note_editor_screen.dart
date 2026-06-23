@@ -42,6 +42,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Timer? _saveTimer;
   Note? _currentNote;
   StreamSubscription? _quillSubscription;
+  bool _showMoreToolbar = false;
+  String _originalTitle = '';
+  String _originalContent = '';
 
   @override
   void initState() {
@@ -49,20 +52,28 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _currentNote = widget.note;
 
     _title = widget.note?.title ?? '';
+    _originalTitle = _title;
     _selectedFolderId = widget.note?.folderId;
     _selectedLocalFolderId = widget.note?.localFolderId ?? widget.defaultLocalFolderId;
 
     if (widget.note?.content != null && widget.note!.content!.isNotEmpty) {
       final delta = Delta.fromJson(jsonDecode(widget.note!.content!) as List);
+      _originalContent = widget.note!.content!;
       _quillC = QuillController(
         document: Document.fromDelta(delta),
         selection: const TextSelection.collapsed(offset: 0),
       );
     } else {
+      _originalContent = '';
       _quillC = QuillController.basic();
     }
 
     _quillSubscription = _quillC.document.changes.listen((_) => _onChanged());
+
+    // 监听选区变化，实时更新工具栏按钮激活状态
+    _quillC.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -87,10 +98,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final delta = _quillC.document.toDelta().toJson();
     final content = jsonEncode(delta);
 
+    final title = _title.trim().isEmpty ? '无标题' : _title.trim();
+    final hasChanged = title != _originalTitle || content != _originalContent;
+
     final existing = _currentNote;
     if (existing == null) {
       final note = Note(
-        title: _title.trim().isEmpty ? '无标题' : _title.trim(),
+        title: title,
         content: content,
         folderId: _selectedFolderId,
         localFolderId: _selectedLocalFolderId,
@@ -100,13 +114,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       _currentNote = note;
     } else {
       final updated = existing.copyWith(
-        title: _title.trim().isEmpty ? '无标题' : _title.trim(),
+        title: title,
         content: content,
-        folderId: () => _selectedFolderId,
-        localFolderId: () => _selectedLocalFolderId,
+        folderId: () => _selectedFolderId ?? existing.folderId,
+        localFolderId: () => _selectedLocalFolderId ?? existing.localFolderId,
         updatedAt: DateTime.now(),
-        syncStatus:
-            existing.syncStatus == 'synced' ? 'modified' : existing.syncStatus,
+        syncStatus: hasChanged && existing.syncStatus == 'synced'
+            ? 'modified'
+            : existing.syncStatus,
       );
       await local.updateNote(updated);
       _currentNote = updated;
@@ -181,7 +196,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   void _toggleAttr(Attribute attr) {
     final sel = _quillC.selection;
-    _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, attr);
+    _quillC.formatText(sel.start, sel.end - sel.start, attr);
   }
 
   List<_MoreAction> get _moreActions => [
@@ -199,16 +214,28 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             icon: Icons.format_strikethrough,
             label: '删除线',
             toggleAttr: Attribute.strikeThrough),
-        const _MoreAction(icon: Icons.format_size, label: '字号'),
-        const _MoreAction(icon: Icons.title, label: '字体'),
+        const _MoreAction(
+            icon: Icons.format_list_numbered,
+            label: '有序列表',
+            toggleAttr: Attribute.ol),
+        const _MoreAction(
+            icon: Icons.format_list_bulleted,
+            label: '无序列表',
+            toggleAttr: Attribute.ul),
+        const _MoreAction(
+            icon: Icons.checklist,
+            label: '任务列表',
+            toggleAttr: Attribute.checked),
         const _MoreAction(
             icon: Icons.format_quote,
             label: '引用',
             toggleAttr: Attribute.blockQuote),
         const _MoreAction(
             icon: Icons.code, label: '代码块', toggleAttr: Attribute.codeBlock),
-        const _MoreAction(icon: Icons.format_align_left, label: '对齐'),
-        const _MoreAction(icon: Icons.format_indent_increase, label: '缩进'),
+        const _MoreAction(
+            icon: Icons.format_align_left, label: '对齐'),
+        const _MoreAction(
+            icon: Icons.format_indent_increase, label: '缩进'),
         const _MoreAction(icon: Icons.link, label: '链接'),
         const _MoreAction(icon: Icons.subscript, label: '下标'),
         const _MoreAction(icon: Icons.superscript, label: '上标'),
@@ -216,29 +243,156 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       ];
 
   void _showMoreOptions() {
+    setState(() {
+      _showMoreToolbar = !_showMoreToolbar;
+    });
+  }
+
+  void _showHeaderPicker() {
+    final currentStyle = _quillC.getSelectionStyle();
+    final currentHeader = currentStyle.attributes['header'];
+    final currentValue = currentHeader?.value;
+
     showModalBottomSheet(
       context: context,
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: _moreActions.map((a) {
-            return InkWell(
-              onTap: () {
-                Navigator.pop(ctx);
-                if (a.toggleAttr != null) _toggleAttr(a.toggleAttr!);
-              },
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('选择样式', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            for (final entry in [
+              ('文本', null),
+              ('一级标题', 1),
+              ('二级标题', 2),
+              ('三级标题', 3),
+            ])
+              ListTile(
+                minLeadingWidth: 24,
+                leading: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Center(
+                    child: Text(
+                      entry.$2 == null ? 'T' : 'H${entry.$2}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: entry.$2 == null ? 14 : (14 + (entry.$2! * 2)).toDouble(),
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+                title: Text(entry.$1),
+                trailing: currentValue == entry.$2
+                    ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                    : null,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  final sel = _quillC.selection;
+                  if (entry.$2 == null) {
+                    _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.header);
+                  } else if (entry.$2 == 1) {
+                    _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.h1);
+                  } else if (entry.$2 == 2) {
+                    _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.h2);
+                  } else if (entry.$2 == 3) {
+                    _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.h3);
+                  }
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSimpleColorPicker() {
+    final currentStyle = _quillC.getSelectionStyle();
+    final currentColor = currentStyle.attributes['color']?.value;
+    final colors = [
+      (Colors.black, '黑色'),
+      (Colors.red, '红色'),
+      (Colors.orange, '橙色'),
+      (Colors.yellow.shade700, '黄色'),
+      (Colors.green, '绿色'),
+      (Colors.blue, '蓝色'),
+      (Colors.purple, '紫色'),
+      (Colors.grey, '灰色'),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('选择颜色', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
                 children: [
-                  Icon(a.icon, size: 24),
-                  const SizedBox(height: 4),
-                  Text(a.label, style: const TextStyle(fontSize: 11)),
+                  for (final c in colors)
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        final sel = _quillC.selection;
+                        _quillC.formatText(
+                          sel.baseOffset,
+                          sel.extentOffset - sel.baseOffset,
+                          ColorAttribute('#${c.$1.toARGB32().toRadixString(16).substring(2)}'),
+                        );
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: c.$1,
+                          shape: BoxShape.circle,
+                          border: currentColor != null &&
+                                  c.$1.toARGB32().toString() == currentColor.toString()
+                              ? Border.all(color: Colors.white, width: 3)
+                              : Border.all(color: Colors.grey.shade300, width: 1),
+                        ),
+                        child: currentColor != null &&
+                                c.$1.toARGB32().toString() == currentColor.toString()
+                            ? const Icon(Icons.check, color: Colors.white, size: 20)
+                            : null,
+                      ),
+                    ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      final sel = _quillC.selection;
+                      _quillC.formatText(
+                        sel.baseOffset,
+                        sel.extentOffset - sel.baseOffset,
+                        const ColorAttribute(null),
+                      );
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.grey.shade300, width: 1),
+                      ),
+                      child: const Icon(Icons.format_clear, color: Colors.grey, size: 20),
+                    ),
+                  ),
                 ],
               ),
-            );
-          }).toList(),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
@@ -524,54 +678,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
         ],
       ),
+      resizeToAvoidBottomInset: true,
       body: Column(
         children: [
-          const Divider(height: 1),
-          QuillSimpleToolbar(
-            controller: _quillC,
-            config: QuillSimpleToolbarConfig(
-              showBoldButton: false,
-              showItalicButton: false,
-              showUnderLineButton: false,
-              showStrikeThrough: false,
-              showInlineCode: false,
-              showFontFamily: false,
-              showFontSize: false,
-              showHeaderStyle: false,
-              showQuote: false,
-              showCodeBlock: false,
-              showListNumbers: true,
-              showListBullets: true,
-              showListCheck: true,
-              showAlignmentButtons: false,
-              showIndent: false,
-              showLink: false,
-              showUndo: true,
-              showRedo: true,
-              showColorButton: true,
-              showBackgroundColorButton: false,
-              showClearFormat: false,
-              showSubscript: false,
-              showSuperscript: false,
-              showDirection: false,
-              showSearchButton: false,
-              showLineHeightButton: false,
-              customButtons: [
-                QuillToolbarCustomButtonOptions(
-                  icon:
-                      const Icon(Icons.add_photo_alternate_outlined, size: 20),
-                  tooltip: '插入图片',
-                  onPressed: _pickAndInsertImage,
-                ),
-                QuillToolbarCustomButtonOptions(
-                  icon: const Icon(Icons.more_horiz, size: 20),
-                  tooltip: '更多',
-                  onPressed: _showMoreOptions,
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
           Expanded(
             child: QuillEditor.basic(
               controller: _quillC,
@@ -585,6 +694,92 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 expands: true,
                 enableInteractiveSelection: true,
               ),
+            ),
+          ),
+          // 展开/收起：更多按钮行（在富文本工具栏上方）
+          if (_showMoreToolbar)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Wrap(
+                spacing: 2,
+                runSpacing: 2,
+                alignment: WrapAlignment.center,
+                children: _moreActions.map((a) {
+                  final isActive = a.toggleAttr != null &&
+                      _quillC.getSelectionStyle().containsKey(a.toggleAttr!.key);
+                  return IconButton(
+                    icon: Icon(a.icon, size: 20),
+                    tooltip: a.label,
+                    color: isActive ? Theme.of(context).colorScheme.primary : null,
+                    onPressed: () {
+                      if (a.toggleAttr != null) {
+                        _toggleAttr(a.toggleAttr!);
+                      }
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  );
+                }).toList(),
+              ),
+            ),
+          const Divider(height: 1),
+          // 富文本工具栏在最下方（更多按钮在同一行，作为最后一个按钮）
+          QuillSimpleToolbar(
+            controller: _quillC,
+            config: QuillSimpleToolbarConfig(
+              showBoldButton: false,
+              showItalicButton: false,
+              showUnderLineButton: false,
+              showStrikeThrough: false,
+              showInlineCode: false,
+              showFontFamily: false,
+              showFontSize: false,
+              showQuote: false,
+              showCodeBlock: false,
+              showListNumbers: false,
+              showListBullets: false,
+              showListCheck: false,
+              showAlignmentButtons: false,
+              showIndent: false,
+              showLink: false,
+              showUndo: true,
+              showRedo: true,
+              showColorButton: false,
+              showBackgroundColorButton: false,
+              showClearFormat: false,
+              showSubscript: false,
+              showSuperscript: false,
+              showDirection: false,
+              showSearchButton: false,
+              showLineHeightButton: false,
+              showDividers: false,
+              showHeaderStyle: false,
+              toolbarSectionSpacing: 2,
+              toolbarRunSpacing: 2,
+              toolbarSize: 36,
+              customButtons: [
+                QuillToolbarCustomButtonOptions(
+                  icon: const Icon(Icons.title, size: 20),
+                  tooltip: '文本 / 标题',
+                  onPressed: _showHeaderPicker,
+                ),
+                QuillToolbarCustomButtonOptions(
+                  icon: const Icon(Icons.color_lens, size: 20),
+                  tooltip: '文字颜色',
+                  onPressed: _showSimpleColorPicker,
+                ),
+                QuillToolbarCustomButtonOptions(
+                  icon: const Icon(Icons.add_photo_alternate_outlined, size: 20),
+                  tooltip: '插入图片',
+                  onPressed: _pickAndInsertImage,
+                ),
+                QuillToolbarCustomButtonOptions(
+                  icon: Icon(_showMoreToolbar ? Icons.expand_less : Icons.more_horiz, size: 20),
+                  tooltip: '更多',
+                  onPressed: _showMoreOptions,
+                ),
+              ],
             ),
           ),
         ],

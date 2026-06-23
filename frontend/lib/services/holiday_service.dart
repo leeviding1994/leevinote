@@ -55,7 +55,7 @@ class HolidayService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString('holidays_$year');
       if (cached != null) {
-        _holidays = _parseHolidayData(cached);
+        _holidays = _parseHolidayData(cached, year);
         _cachedYear = year;
         _loading = false;
         notifyListeners();
@@ -70,7 +70,7 @@ class HolidayService extends ChangeNotifier {
         if (data['code'] == 0 && data['holiday'] != null) {
           final holidayJson = jsonEncode(data['holiday']);
           await prefs.setString('holidays_$year', holidayJson);
-          _holidays = _parseHolidayData(holidayJson);
+          _holidays = _parseHolidayData(holidayJson, year);
           _cachedYear = year;
         }
       }
@@ -82,15 +82,30 @@ class HolidayService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Map<String, HolidayInfo> _parseHolidayData(String jsonString) {
+  Map<String, HolidayInfo> _parseHolidayData(String jsonString, int year) {
     final map = <String, HolidayInfo>{};
     try {
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
       for (final entry in data.entries) {
         final dateStr = entry.key;
         final info = entry.value as Map<String, dynamic>;
-        map[dateStr] = HolidayInfo(
-          date: DateTime.parse(dateStr),
+        // API keys may be "01-01" or "2026-01-01"
+        late final DateTime date;
+        if (dateStr.contains('-')) {
+          final parts = dateStr.split('-');
+          if (parts.length == 2) {
+            date = DateTime(year, int.parse(parts[0]), int.parse(parts[1]));
+          } else if (parts.length == 3) {
+            date = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+          } else {
+            continue;
+          }
+        } else {
+          continue;
+        }
+        final key = _dateKey(date);
+        map[key] = HolidayInfo(
+          date: date,
           name: info['name']?.toString() ?? '',
           isHoliday: info['holiday'] == true,
         );

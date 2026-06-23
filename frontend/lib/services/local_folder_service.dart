@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:leevinote/models/folder.dart';
+import 'package:leevinote/services/database_helper.dart';
 
 class LocalFolderService extends ChangeNotifier {
+  final DatabaseHelper _db = DatabaseHelper();
   List<Folder> _folders = [];
   bool _loaded = false;
 
@@ -15,40 +15,41 @@ class LocalFolderService extends ChangeNotifier {
     _loaded = true;
   }
 
-  String get _key => 'local_folders';
-
   Future<void> _load() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final json = prefs.getString(_key) ?? '[]';
-      final list = jsonDecode(json) as List;
-      _folders = list.map((e) => Folder.fromJson(e as Map<String, dynamic>)).toList();
+      final rows = await _db.getAllFolders();
+      _folders = rows.map((r) => _rowToFolder(r)).toList();
     } catch (_) {
       _folders = [];
     }
   }
 
-  Future<void> _persist() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final json = jsonEncode(_folders.map((f) => f.toJson()).toList());
-      await prefs.setString(_key, json);
-    } catch (_) {}
+  Folder _rowToFolder(Map<String, dynamic> row) {
+    return Folder(
+      id: row['id'] as int?,
+      localId: row['local_id'] as String,
+      name: row['name'] as String,
+      parentId: row['parent_id'] as int?,
+      localParentId: row['local_parent_id'] as String?,
+      syncStatus: row['sync_status'] as String,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at'] as int),
+    );
   }
 
   Future<void> addFolder(Folder folder) async {
     await ensureLoaded();
+    await _db.insertFolder(folder);
     _folders.add(folder);
-    await _persist();
     notifyListeners();
   }
 
   Future<void> updateFolder(Folder folder) async {
     await ensureLoaded();
+    await _db.updateFolder(folder);
     final index = _folders.indexWhere((f) => f.localId == folder.localId);
     if (index != -1) {
       _folders[index] = folder;
-      await _persist();
       notifyListeners();
     }
   }
@@ -59,33 +60,64 @@ class LocalFolderService extends ChangeNotifier {
     if (i == -1) return;
     final folder = _folders[i];
     if (!force && folder.id != null && folder.syncStatus != 'local') {
-      _folders[i] = folder.copyWith(syncStatus: 'deleted');
+      final updated = folder.copyWith(syncStatus: 'deleted');
+      await _db.updateFolder(updated);
+      _folders[i] = updated;
     } else {
+      await _db.forceDeleteFolder(localId);
       _folders.removeAt(i);
     }
-    await _persist();
     notifyListeners();
   }
 
   Future<void> replaceAll(List<Folder> folders) async {
+    await _db.clearAll();
+    for (final folder in folders) {
+      await _db.insertFolder(folder);
+    }
     _folders = List.from(folders);
-    await _persist();
     notifyListeners();
   }
 
   Future<void> addOrUpdateFromRemote(Folder remote) async {
     await ensureLoaded();
+
+    // Resolve remote parent_id to a local folder id
+    String? resolvedLocalParentId;
+    if (remote.parentId != null) {
+      for (final f in _folders) {
+        if (f.id == remote.parentId) {
+          resolvedLocalParentId = f.localId;
+          break;
+        }
+      }
+    }
+
     final i = _folders.indexWhere((f) => f.id != null && f.id == remote.id);
     if (i != -1) {
       final existing = _folders[i];
-      _folders[i] = remote.copyWith(
+      final updated = remote.copyWith(
         localId: existing.localId,
-        localParentId: existing.localParentId != null ? () => existing.localParentId : null,
+        localParentId: () => resolvedLocalParentId ?? existing.localParentId,
+        syncStatus: 'synced',
       );
+      await _db.updateFolder(updated);
+      _folders[i] = updated;
     } else {
-      _folders.add(remote);
+      final inserted = remote.copyWith(
+        localParentId: () => resolvedLocalParentId,
+        syncStatus: 'synced',
+      );
+      await _db.insertFolder(inserted);
+      _folders.add(inserted);
     }
-    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> clearAll() async {
+    await ensureLoaded();
+    await _db.clearAll();
+    _folders = [];
     notifyListeners();
   }
 }

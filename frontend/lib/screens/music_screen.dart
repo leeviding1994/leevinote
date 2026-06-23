@@ -54,6 +54,7 @@ class MusicScreenState extends State<MusicScreen> {
               ? _buildEmptyState()
               : _buildMusicList(musicService),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'music_fab',
         onPressed: () => _pickAndAddMusic(context),
         child: const Icon(Icons.add),
       ),

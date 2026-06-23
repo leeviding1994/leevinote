@@ -10,6 +10,7 @@ class Alarm {
   final DateTime alarmTime;
   final bool enabled;
   final String? repeatPattern;
+  final List<int> weekDays;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String syncStatus;
@@ -22,6 +23,7 @@ class Alarm {
     required this.alarmTime,
     this.enabled = true,
     this.repeatPattern,
+    this.weekDays = const [],
     DateTime? createdAt,
     DateTime? updatedAt,
     this.syncStatus = 'local',
@@ -37,6 +39,7 @@ class Alarm {
     DateTime? alarmTime,
     bool? enabled,
     String? repeatPattern,
+    List<int>? weekDays,
     DateTime? updatedAt,
     String? syncStatus,
   }) {
@@ -48,6 +51,7 @@ class Alarm {
       alarmTime: alarmTime ?? this.alarmTime,
       enabled: enabled ?? this.enabled,
       repeatPattern: repeatPattern ?? this.repeatPattern,
+      weekDays: weekDays ?? this.weekDays,
       createdAt: createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       syncStatus: syncStatus ?? this.syncStatus,
@@ -63,6 +67,9 @@ class Alarm {
       alarmTime: DateTime.parse(json['alarm_time']),
       enabled: json['enabled'] ?? true,
       repeatPattern: json['repeat_pattern'],
+      weekDays: json['week_days'] is List
+          ? (json['week_days'] as List).map((e) => e as int).toList()
+          : [],
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -82,6 +89,7 @@ class Alarm {
       'alarm_time': alarmTime.toIso8601String(),
       'enabled': enabled,
       'repeat_pattern': repeatPattern,
+      'week_days': weekDays,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'sync_status': syncStatus,
@@ -96,6 +104,7 @@ class Alarm {
       'alarm_time': alarmTime.toIso8601String(),
       'enabled': enabled,
       'repeat_pattern': repeatPattern,
+      'week_days': weekDays,
     };
   }
 }

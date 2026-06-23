@@ -31,9 +31,10 @@ class NotesScreenState extends State<NotesScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<LocalNoteService>().ensureLoaded();
-      context.read<LocalFolderService>().ensureLoaded();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<LocalNoteService>().ensureLoaded();
+      await context.read<LocalFolderService>().ensureLoaded();
+      await _updateFilteredNotes();
     });
   }
 
@@ -46,10 +47,11 @@ class NotesScreenState extends State<NotesScreen> {
   Future<void> _deleteNote(Note note) async {
     final local = context.read<LocalNoteService>();
     if (note.id != null) {
-      await local.updateNote(note.copyWith(syncStatus: 'deleted'));
+      await local.forceDeleteNote(note.localId);
     } else {
       await local.deleteNote(note.localId);
     }
+    await _updateFilteredNotes();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已删除"${note.title}"')),
@@ -308,34 +310,32 @@ class NotesScreenState extends State<NotesScreen> {
     }
   }
 
-  List<Note> get _notes => context.watch<LocalNoteService>().notes;
   List<Folder> get _folders => context
       .watch<LocalFolderService>()
       .folders
       .where((f) => f.syncStatus != 'deleted')
       .toList();
 
-  List<Note> get _filteredNotes {
-    return _notes.where((n) {
-      if (n.syncStatus == 'deleted') return false;
-      if (_searchC.text.isNotEmpty) {
-        final q = _searchC.text.toLowerCase();
-        final matchTitle = n.title.toLowerCase().contains(q);
-        final matchContent = _plainText(n.content).toLowerCase().contains(q);
-        if (!matchTitle && !matchContent) return false;
-      } else {
-        if (_selectedLocalFolderId != null) {
-          final noteFolderLocalId = n.localFolderId ??
-              (n.folderId != null
-                  ? _folders.where((f) => f.id == n.folderId).firstOrNull?.localId
-                  : null);
-          if (noteFolderLocalId != _selectedLocalFolderId) return false;
-        } else if (n.localFolderId != null || n.folderId != null) {
-          return false;
-        }
+  List<Note> _filteredNotes = [];
+
+  Future<void> _updateFilteredNotes() async {
+    final noteService = context.read<LocalNoteService>();
+    await noteService.ensureLoaded();
+    if (_searchC.text.isNotEmpty) {
+      final results = await noteService.searchNotes(_searchC.text);
+      if (mounted) {
+        setState(() {
+          _filteredNotes = results;
+        });
       }
-      return true;
-    }).toList();
+    } else {
+      final results = await noteService.getNotesByFolder(_selectedLocalFolderId);
+      if (mounted) {
+        setState(() {
+          _filteredNotes = results;
+        });
+      }
+    }
   }
 
   List<Folder> get _childFolders {
@@ -418,11 +418,20 @@ class NotesScreenState extends State<NotesScreen> {
           } catch (_) {}
         } else if (folder.syncStatus == 'local' && folder.id == null) {
           // Resolve parentId from localParentId
-          int? parentId = folder.parentId;
-          if (folder.localParentId != null &&
-              localIdToRemoteId.containsKey(folder.localParentId)) {
-            parentId = localIdToRemoteId[folder.localParentId];
-          }
+           int? parentId = folder.parentId;
+           if (folder.localParentId != null) {
+             // First try to get folder from localIdToRemoteId (for synced folders)
+             if (localIdToRemoteId.containsKey(folder.localParentId)) {
+               parentId = localIdToRemoteId[folder.localParentId];
+             } else {
+               // If not synced yet, try to get from localFolders
+               final allFolders = folderService.folders;
+               final parentFolder = allFolders.where((f) => f.localId == folder.localParentId).firstOrNull;
+               if (parentFolder != null && parentFolder.id != null) {
+                 parentId = parentFolder.id;
+               }
+            }
+           }
           final remoteJson = {
             'name': folder.name,
             'parent_id': parentId,
@@ -432,9 +441,10 @@ class NotesScreenState extends State<NotesScreen> {
           final newId = remoteId is int
               ? remoteId
               : int.tryParse(remoteId?.toString() ?? '');
-          if (newId != null) {
-            localIdToRemoteId[folder.localId] = newId;
+          if (newId == null) {
+            throw Exception('创建文件夹失败：服务器未返回 ID');
           }
+          localIdToRemoteId[folder.localId] = newId;
           final updated = folder.copyWith(
             id: newId,
             parentId: () => parentId,
@@ -443,9 +453,18 @@ class NotesScreenState extends State<NotesScreen> {
           await folderService.updateFolder(updated);
         } else if (folder.syncStatus == 'modified' && folder.id != null) {
           int? parentId = folder.parentId;
-          if (folder.localParentId != null &&
-              localIdToRemoteId.containsKey(folder.localParentId)) {
-            parentId = localIdToRemoteId[folder.localParentId];
+          if (folder.localParentId != null) {
+            // First try to get folder from localIdToRemoteId (for synced folders)
+            if (localIdToRemoteId.containsKey(folder.localParentId)) {
+              parentId = localIdToRemoteId[folder.localParentId];
+            } else {
+              // If not synced yet, try to get from localFolders
+              final allFolders = folderService.folders;
+              final parentFolder = allFolders.where((f) => f.localId == folder.localParentId).firstOrNull;
+              if (parentFolder != null && parentFolder.id != null) {
+                parentId = parentFolder.id;
+              }
+            }
           }
           final remoteJson = {
             'name': folder.name,
@@ -463,15 +482,24 @@ class NotesScreenState extends State<NotesScreen> {
       }
 
       // Sync notes
-      final localNotes = local.notes;
-      for (final note in List.from(localNotes)) {
-        if (note.syncStatus == 'local' && note.id == null) {
-          // Resolve folderId from localFolderId
-          int? folderId = note.folderId;
-          if (note.localFolderId != null &&
-              localIdToRemoteId.containsKey(note.localFolderId)) {
-            folderId = localIdToRemoteId[note.localFolderId];
-          }
+       final localNotes = local.notes;
+       for (final note in List.from(localNotes)) {
+         if (note.syncStatus == 'local' && note.id == null) {
+           // Resolve folderId from localFolderId
+           int? folderId = note.folderId;
+           if (note.localFolderId != null) {
+             // First try to get folder from localIdToRemoteId (for synced folders)
+             if (localIdToRemoteId.containsKey(note.localFolderId)) {
+               folderId = localIdToRemoteId[note.localFolderId];
+             } else {
+               // If not synced yet, try to get from localFolders
+               final allFolders = folderService.folders;
+               final folder = allFolders.where((f) => f.localId == note.localFolderId).firstOrNull;
+               if (folder != null && folder.id != null) {
+                 folderId = folder.id;
+               }
+             }
+           }
           final remoteJson = {
             'title': note.title,
             'content': note.content,
@@ -480,19 +508,32 @@ class NotesScreenState extends State<NotesScreen> {
           };
           final resp = await api.post(ApiConstants.notes, remoteJson);
           final remoteId = resp['id'];
+          final newId = remoteId is int
+              ? remoteId
+              : int.tryParse(remoteId?.toString() ?? '');
+          if (newId == null) {
+            throw Exception('创建笔记失败：服务器未返回 ID');
+          }
           final updated = note.copyWith(
-            id: remoteId is int
-                ? remoteId
-                : int.tryParse(remoteId?.toString() ?? ''),
+            id: newId,
             folderId: () => folderId,
             syncStatus: 'synced',
           );
           await local.updateNote(updated);
         } else if (note.syncStatus == 'modified' && note.id != null) {
           int? folderId = note.folderId;
-          if (note.localFolderId != null &&
-              localIdToRemoteId.containsKey(note.localFolderId)) {
-            folderId = localIdToRemoteId[note.localFolderId];
+          if (note.localFolderId != null) {
+            // First try to get folder from localIdToRemoteId (for synced folders)
+            if (localIdToRemoteId.containsKey(note.localFolderId)) {
+              folderId = localIdToRemoteId[note.localFolderId];
+            } else {
+              // If not synced yet, try to get from localFolders
+              final allFolders = folderService.folders;
+              final folder = allFolders.where((f) => f.localId == note.localFolderId).firstOrNull;
+              if (folder != null && folder.id != null) {
+                folderId = folder.id;
+              }
+            }
           }
           final remoteJson = {
             'title': note.title,
@@ -508,21 +549,17 @@ class NotesScreenState extends State<NotesScreen> {
         } else if (note.syncStatus == 'deleted' && note.id != null) {
           try {
             await api.delete('${ApiConstants.notes}/${note.id}');
-            await local.deleteNote(note.localId);
+            await local.forceDeleteNote(note.localId);
           } catch (_) {}
         }
       }
 
-      final remoteData = await api.getList(ApiConstants.notes);
-      for (final e in remoteData) {
-        final remote = Note.fromJson(e as Map<String, dynamic>)
-            .copyWith(syncStatus: 'synced');
-        await local.addOrUpdateFromRemote(remote);
-      }
-
-      final remoteFolders = await api.getList(ApiConstants.folders);
-      final remoteFolderIds = remoteFolders
-          .map((e) => (e as Map)['id'] as int?)
+      // Pull remote folders first so we can map folder_id -> local_folder_id
+      final remoteFolderList = (await api.getList(ApiConstants.folders))
+          .map((e) => Folder.fromJson(e as Map<String, dynamic>))
+          .toList();
+      final remoteFolderIds = remoteFolderList
+          .map((f) => f.id)
           .whereType<int>()
           .toSet();
       for (final folder in List.from(folderService.folders)) {
@@ -532,12 +569,40 @@ class NotesScreenState extends State<NotesScreen> {
           await folderService.deleteFolder(folder.localId, force: true);
         }
       }
-      for (final e in remoteFolders) {
-        final remote = Folder.fromJson(e as Map<String, dynamic>);
+
+      // Sort remote folders topologically so parents are inserted before children
+      final folderByRemoteId = <int, Folder>{
+        for (final f in remoteFolderList)
+          if (f.id != null) f.id!: f
+      };
+      final sortedRemoteFolders = <Folder>[];
+      final remoteVisited = <int>{};
+      void visitFolder(Folder f) {
+        if (f.id == null || remoteVisited.contains(f.id)) return;
+        remoteVisited.add(f.id!);
+        final parentId = f.parentId;
+        if (parentId != null && folderByRemoteId.containsKey(parentId)) {
+          visitFolder(folderByRemoteId[parentId]!);
+        }
+        sortedRemoteFolders.add(f);
+      }
+
+      for (final f in remoteFolderList) {
+        visitFolder(f);
+      }
+
+      for (final remote in sortedRemoteFolders) {
         await folderService
             .addOrUpdateFromRemote(remote.copyWith(syncStatus: 'synced'));
       }
 
+      // Build remote folder id -> local folder id map for notes
+      final remoteFolderIdToLocalId = <int, String>{
+        for (final f in folderService.folders)
+          if (f.id != null) f.id!: f.localId
+      };
+
+      final remoteData = await api.getList(ApiConstants.notes);
       final remoteNoteIds = remoteData
           .map((e) => (e as Map)['id'] as int?)
           .whereType<int>()
@@ -549,6 +614,19 @@ class NotesScreenState extends State<NotesScreen> {
           await local.deleteNote(note.localId);
         }
       }
+      for (final e in remoteData) {
+        final remote = Note.fromJson(e as Map<String, dynamic>)
+            .copyWith(syncStatus: 'synced');
+        final localFolderId = remote.folderId != null
+            ? remoteFolderIdToLocalId[remote.folderId]
+            : null;
+        await local.addOrUpdateFromRemote(
+          remote.copyWith(localFolderId: () => localFolderId),
+        );
+      }
+
+      // 刷新笔记列表
+      await _updateFilteredNotes();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -611,6 +689,7 @@ class NotesScreenState extends State<NotesScreen> {
 
   void selectFolder(String? localFolderId) {
     setState(() => _selectedLocalFolderId = localFolderId);
+    _updateFilteredNotes();
     onFolderChanged?.call();
   }
 
@@ -770,6 +849,10 @@ class NotesScreenState extends State<NotesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch services to trigger rebuilds when data changes
+    context.watch<LocalNoteService>();
+    context.watch<LocalFolderService>();
+
     final filtered = _filteredNotes;
     final childFolders = _searchC.text.isEmpty ? _childFolders : <Folder>[];
     final totalItems = childFolders.length + filtered.length;
@@ -782,27 +865,41 @@ class NotesScreenState extends State<NotesScreen> {
             controller: _searchC,
             hintText: '搜索标题或内容...',
             padding: const WidgetStatePropertyAll(
-                EdgeInsets.symmetric(horizontal: 12)),
+                EdgeInsets.symmetric(horizontal: 16)),
             leading: Padding(
-              padding: const EdgeInsets.only(left: 4),
+              padding: const EdgeInsets.only(left: 8),
               child: Icon(Icons.search,
-                  size: 20,
+                  size: 22,
                   color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             trailing: [
               if (_searchC.text.isNotEmpty)
                 IconButton(
-                  icon: const Icon(Icons.clear, size: 18),
+                  icon: const Icon(Icons.clear, size: 20),
                   onPressed: () {
                     _searchC.clear();
-                    setState(() {});
+                    _updateFilteredNotes();
                   },
                 ),
             ],
-            onChanged: (_) => setState(() {}),
+              onChanged: (_) => _updateFilteredNotes(),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  width: 1,
+                ),
+              ),
+            ),
+            backgroundColor: WidgetStatePropertyAll(
+              Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            ),
+            elevation: const WidgetStatePropertyAll(0),
+            shadowColor: WidgetStatePropertyAll(Colors.transparent),
+            surfaceTintColor: WidgetStatePropertyAll(Colors.transparent),
           ),
         ),
-        const Divider(height: 1),
         Expanded(
           child: totalItems == 0
               ? const SizedBox.shrink()

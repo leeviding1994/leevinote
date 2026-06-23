@@ -28,7 +28,11 @@ class ScheduleService extends ChangeNotifier {
 
   List<Schedule> getSchedulesForDate(DateTime date) {
     final dateKey = DateTime(date.year, date.month, date.day);
-    return schedulesByDate[dateKey] ?? [];
+    final list = schedulesByDate[dateKey] ?? [];
+    return List<Schedule>.from(list)
+        .where((s) => s.syncStatus != 'deleted')
+        .toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
   }
 
   List<Schedule> getSchedulesForRange(DateTime start, DateTime end) {
@@ -98,6 +102,23 @@ class ScheduleService extends ChangeNotifier {
     return localSchedule;
   }
 
+  Future<void> updateSchedule(Schedule schedule) async {
+    final index = _schedules.indexWhere((s) => s.localId == schedule.localId);
+    if (index == -1) return;
+    final updated = schedule.copyWith(syncStatus: schedule.id != null ? 'modified' : 'local');
+    await _local.updateSchedule(updated);
+    _schedules[index] = updated;
+    // 如果已同步到服务器，尝试立即更新
+    if (updated.id != null) {
+      try {
+        await _api.put('${ApiConstants.schedules}/${updated.id}', updated.toRemoteJson());
+      } catch (_) {
+        // 静默失败，下次 sync 时会同步
+      }
+    }
+    notifyListeners();
+  }
+
   Future<void> deleteSchedule(String localId) async {
     final schedule = _schedules.firstWhere(
       (s) => s.localId == localId,
@@ -113,6 +134,25 @@ class ScheduleService extends ChangeNotifier {
       _schedules.removeWhere((s) => s.localId == localId);
     }
     notifyListeners();
+  }
+
+  Future<void> toggleCompleted(String localId) async {
+    final updated = await _local.toggleCompleted(localId);
+    if (updated != null) {
+      final index = _schedules.indexWhere((s) => s.localId == localId);
+      if (index != -1) {
+        _schedules[index] = updated;
+      }
+      // 如果已同步到服务器，尝试同步完成状态
+      if (updated.id != null) {
+        try {
+          await _api.patch('${ApiConstants.schedules}/${updated.id}/completed');
+        } catch (_) {
+          // 静默失败，下次 sync 时会同步
+        }
+      }
+      notifyListeners();
+    }
   }
 
   Future<bool> sync() async {

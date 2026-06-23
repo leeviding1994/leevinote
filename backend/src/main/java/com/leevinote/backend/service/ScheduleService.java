@@ -27,4 +27,31 @@ public class ScheduleService {
     public void deleteSchedule(Long id) {
         scheduleRepository.deleteById(id);
     }
+
+    public Optional<Schedule> updateSchedule(Long id, Long userId, Schedule updatedSchedule) {
+        Optional<Schedule> optional = scheduleRepository.findByIdAndUserId(id, userId);
+        if (optional.isPresent()) {
+            Schedule schedule = optional.get();
+            schedule.setTitle(updatedSchedule.getTitle());
+            schedule.setDescription(updatedSchedule.getDescription());
+            schedule.setStartTime(updatedSchedule.getStartTime());
+            schedule.setEndTime(updatedSchedule.getEndTime());
+            schedule.setLocation(updatedSchedule.getLocation());
+            if (updatedSchedule.getCompleted() != null) {
+                schedule.setCompleted(updatedSchedule.getCompleted());
+            }
+            return Optional.of(scheduleRepository.save(schedule));
+        }
+        return Optional.empty();
+    }
+
+    public Optional<Schedule> toggleCompleted(Long id, Long userId) {
+        Optional<Schedule> optional = scheduleRepository.findByIdAndUserId(id, userId);
+        if (optional.isPresent()) {
+            Schedule schedule = optional.get();
+            schedule.setCompleted(Boolean.TRUE.equals(schedule.getCompleted()) ? false : true);
+            return Optional.of(scheduleRepository.save(schedule));
+        }
+        return Optional.empty();
+    }
 }
