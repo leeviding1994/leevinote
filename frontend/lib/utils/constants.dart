@@ -17,4 +17,6 @@ class ApiConstants {
   static const String music = '/music';
   static const String videos = '/videos';
   static const String schedules = '/schedules';
+  static const String transactions = '/transactions';
+  static const String transactionCategories = '/transaction-categories';
 }

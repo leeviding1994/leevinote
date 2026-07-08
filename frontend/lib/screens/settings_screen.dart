@@ -228,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showModuleVisibilitySheet(SettingsService settings) {
     final visibility = Map<String, bool>.from(settings.moduleVisibility);
-    final moduleMap = {for (final m in settings.modules) m.id: m};
+    final moduleMap = {for (final m in settings.allModules) m.id: m};
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -295,7 +295,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
-            final moduleMap = {for (final m in settings.modules) m.id: m};
+            final moduleMap = {for (final m in settings.allModules) m.id: m};
             return SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),

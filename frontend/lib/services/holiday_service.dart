@@ -34,6 +34,15 @@ class HolidayService extends ChangeNotifier {
     return h?.isHoliday ?? false;
   }
 
+  /// 是否显示节假日名称（只有节假日当天才显示，调休/连休的其余天数只标红不显示名称）
+  bool isHolidayNameDay(DateTime date) {
+    final h = getHoliday(date);
+    if (h == null || !h.isHoliday) return false;
+    final yesterday = date.subtract(const Duration(days: 1));
+    final prev = getHoliday(yesterday);
+    return prev?.name != h.name;
+  }
+
   bool isWeekend(DateTime date) {
     if (isHoliday(date)) return true;
     final weekday = date.weekday;

@@ -7,8 +7,9 @@ import 'package:leevinote/utils/constants.dart';
 
 class ApiService {
   late Dio _dio;
+  VoidCallback? onUnauthorized;
 
-  ApiService() {
+  ApiService({this.onUnauthorized}) {
     _dio = Dio(BaseOptions(
       baseUrl: ApiConstants.baseUrl,
       connectTimeout: const Duration(seconds: 30),
@@ -29,7 +30,11 @@ class ApiService {
       },
       onError: (error, handler) async {
         if (error.response?.statusCode == 401 || error.response?.statusCode == 403) {
-          await _deleteToken();
+          final token = await _readToken();
+          if (token != null) {
+            await _deleteToken();
+            onUnauthorized?.call();
+          }
         }
         handler.next(error);
       },

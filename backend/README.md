@@ -78,6 +78,17 @@ mvn spring-boot:run
 - `GET /api/schedules/{id}` - 获取日程详情
 - `DELETE /api/schedules/{id}` - 删除日程
 
+### 记账
+- `GET /api/transactions` - 获取收支记录列表
+- `POST /api/transactions` - 创建收支记录
+- `PUT /api/transactions/{id}` - 更新收支记录
+- `DELETE /api/transactions/{id}` - 删除收支记录
+- `GET /api/transactions/statistics` - 按日/月/年统计收支
+- `GET /api/transaction-categories` - 获取收支分类
+- `POST /api/transaction-categories` - 创建分类
+- `PUT /api/transaction-categories/{id}` - 更新分类
+- `DELETE /api/transaction-categories/{id}` - 删除分类
+
 ## 项目结构
 
 ```

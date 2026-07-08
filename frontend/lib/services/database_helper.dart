@@ -24,7 +24,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await _createTables(db);
       },
@@ -35,6 +35,10 @@ class DatabaseHelper {
           await db.execute('DROP TABLE IF EXISTS folders');
           await _createTables(db);
           await _migrateFromSharedPreferences(db);
+        }
+        if (oldVersion <= 2) {
+          // v2 -> v3: add bookkeeping module tables
+          await _createTransactionTables(db);
         }
       },
       onOpen: (db) async {
@@ -346,9 +350,222 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> _createTransactionTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS transaction_categories (
+        id INTEGER,
+        local_id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        icon TEXT,
+        color TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'local',
+        created_at INTEGER,
+        updated_at INTEGER,
+        is_deleted INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_transaction_categories_type ON transaction_categories(type)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_transaction_categories_sync_status ON transaction_categories(sync_status)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_transaction_categories_is_deleted ON transaction_categories(is_deleted)
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS transactions (
+        id INTEGER,
+        local_id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        amount REAL NOT NULL,
+        transaction_date INTEGER NOT NULL,
+        category_id INTEGER,
+        local_category_id TEXT,
+        note TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'local',
+        created_at INTEGER,
+        updated_at INTEGER,
+        is_deleted INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_transactions_transaction_date ON transactions(transaction_date)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON transactions(category_id)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_transactions_local_category_id ON transactions(local_category_id)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_transactions_sync_status ON transactions(sync_status)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_transactions_is_deleted ON transactions(is_deleted)
+    ''');
+  }
+
+  // Transaction Categories CRUD
+  Future<List<Map<String, dynamic>>> getAllTransactionCategories() async {
+    final db = await database;
+    return await db.query(
+      'transaction_categories',
+      where: 'is_deleted = ?',
+      whereArgs: [0],
+      orderBy: 'type ASC, created_at ASC',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getTransactionCategoriesByType(String type) async {
+    final db = await database;
+    return await db.query(
+      'transaction_categories',
+      where: 'is_deleted = ? AND type = ?',
+      whereArgs: [0, type],
+      orderBy: 'created_at ASC',
+    );
+  }
+
+  Future<Map<String, dynamic>?> getTransactionCategoryByLocalId(String localId) async {
+    final db = await database;
+    final results = await db.query(
+      'transaction_categories',
+      where: 'local_id = ?',
+      whereArgs: [localId],
+      limit: 1,
+    );
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  Future<void> insertTransactionCategory(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert(
+      'transaction_categories',
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updateTransactionCategory(String localId, Map<String, dynamic> data) async {
+    final db = await database;
+    await db.update(
+      'transaction_categories',
+      data,
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  Future<void> deleteTransactionCategory(String localId) async {
+    final db = await database;
+    await db.update(
+      'transaction_categories',
+      {'is_deleted': 1},
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  Future<void> forceDeleteTransactionCategory(String localId) async {
+    final db = await database;
+    await db.delete(
+      'transaction_categories',
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  // Transactions CRUD
+  Future<List<Map<String, dynamic>>> getAllTransactions() async {
+    final db = await database;
+    return await db.query(
+      'transactions',
+      where: 'is_deleted = ?',
+      whereArgs: [0],
+      orderBy: 'transaction_date DESC, created_at DESC',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getTransactionsByDateRange(int start, int end) async {
+    final db = await database;
+    return await db.query(
+      'transactions',
+      where: 'is_deleted = ? AND transaction_date >= ? AND transaction_date <= ?',
+      whereArgs: [0, start, end],
+      orderBy: 'transaction_date DESC, created_at DESC',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getTransactionsByType(String type) async {
+    final db = await database;
+    return await db.query(
+      'transactions',
+      where: 'is_deleted = ? AND type = ?',
+      whereArgs: [0, type],
+      orderBy: 'transaction_date DESC, created_at DESC',
+    );
+  }
+
+  Future<Map<String, dynamic>?> getTransactionByLocalId(String localId) async {
+    final db = await database;
+    final results = await db.query(
+      'transactions',
+      where: 'local_id = ?',
+      whereArgs: [localId],
+      limit: 1,
+    );
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  Future<void> insertTransaction(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert(
+      'transactions',
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updateTransaction(String localId, Map<String, dynamic> data) async {
+    final db = await database;
+    await db.update(
+      'transactions',
+      data,
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  Future<void> deleteTransaction(String localId) async {
+    final db = await database;
+    await db.update(
+      'transactions',
+      {'is_deleted': 1},
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  Future<void> forceDeleteTransaction(String localId) async {
+    final db = await database;
+    await db.delete(
+      'transactions',
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
   Future<void> clearAll() async {
     final db = await database;
     await db.delete('notes');
     await db.delete('folders');
+    await db.delete('transactions');
+    await db.delete('transaction_categories');
   }
 }

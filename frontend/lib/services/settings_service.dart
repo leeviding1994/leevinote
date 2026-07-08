@@ -33,6 +33,7 @@ const _defaultModules = [
   NavModule(id: 'music', label: '音乐', icon: Icons.music_note),
   NavModule(id: 'videos', label: '视频', icon: Icons.video_library),
   NavModule(id: 'schedules', label: '日程', icon: Icons.calendar_today),
+  NavModule(id: 'transactions', label: '记账', icon: Icons.account_balance_wallet),
   NavModule(id: 'profile', label: '我的', icon: Icons.person, visible: true),
 ];
 
@@ -42,6 +43,7 @@ const _defaultModuleVisibility = {
   'music': true,
   'videos': true,
   'schedules': true,
+  'transactions': true,
   'profile': true,
 };
 
@@ -71,6 +73,7 @@ class SettingsService extends ChangeNotifier {
   Color get themeColor => _themeColor;
   List<String> get moduleOrder => _moduleOrder;
   Map<String, bool> get moduleVisibility => Map.unmodifiable(_moduleVisibility);
+  List<NavModule> get allModules => _defaultModules;
   List<NavModule> get modules {
     final map = {for (final m in _defaultModules) m.id: m};
     final visibleModules = _moduleOrder
@@ -117,7 +120,14 @@ class SettingsService extends ChangeNotifier {
       }
       final visibility = prefs.getStringList('module_visibility');
       if (visibility != null) {
-        _moduleVisibility = {for (final v in visibility) v.split(':')[0]: v.split(':')[1] == 'true'};
+        final savedVisibility = {for (final v in visibility) v.split(':')[0]: v.split(':')[1] == 'true'};
+        // 合并保存的可见性设置与默认设置：新增模块默认可见
+        _moduleVisibility = Map.from(_defaultModuleVisibility);
+        for (final entry in savedVisibility.entries) {
+          if (_moduleVisibility.containsKey(entry.key)) {
+            _moduleVisibility[entry.key] = entry.value;
+          }
+        }
         _moduleVisibility['profile'] = true;
       }
     } catch (_) {}

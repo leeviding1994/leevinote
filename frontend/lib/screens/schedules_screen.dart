@@ -370,7 +370,7 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                     '周${_weekdayNames[_selectedDay.weekday] ?? ''}',
                     style: TextStyle(
                       fontSize: 16,
-                      color: isWeekend ? Colors.red.shade400 : Colors.grey,
+                      color: isWeekend || isHoli ? Colors.red.shade400 : Colors.grey,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -899,7 +899,6 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     DateTime day,
     ScheduleService service,
   ) {
-    final events = service.getSchedulesForDate(day);
     final holidayService = context.read<HolidayService>();
     final isHoli = holidayService.isHoliday(day);
     final holiday = holidayService.getHoliday(day);
@@ -910,164 +909,194 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     showDialog(
       context: context,
       builder: (ctx) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.6,
-              maxWidth: MediaQuery.of(context).size.width * 0.85,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '${day.month}月${day.day}日',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                if (isToday) ...[
-                                  const SizedBox(width: 6),
-                                  _todayBadge(context),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Text(
-                                  '周${_weekdayNames[day.weekday] ?? ''}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isWeekend || isHoli
-                                        ? Colors.red.shade400
-                                        : Colors.grey.shade600,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  lunarFull,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                                if (isHoli && holiday != null) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.shade50,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      holiday.name,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.red.shade700,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final events = service.getSchedulesForDate(day);
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.6,
+                  maxWidth: MediaQuery.of(context).size.width * 0.85,
                 ),
-                const Divider(height: 1),
-                if (events.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(
-                      child: Text(
-                        '暂无日程',
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                    ),
-                  )
-                else
-                  Flexible(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      shrinkWrap: true,
-                      itemCount: events.length,
-                      itemBuilder: (context, index) {
-                        final event = events[index];
-                        final colorIndex = event.localId.hashCode.abs();
-                        final color = _getScheduleColor(colorIndex);
-                        final startStr = DateFormat('HH:mm').format(event.startTime);
-                        final endStr = DateFormat('HH:mm').format(event.endTime);
-                        final isAllDay = event.startTime.hour == 0 && event.endTime.hour == 23;
-
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: color.withValues(alpha: 0.15),
-                              child: Icon(
-                                isAllDay ? Icons.event : Icons.access_time,
-                                color: color,
-                                size: 18,
+                child: Stack(
+                  children: [
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(16),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '${day.month}月${day.day}日',
+                                          style: const TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        if (isToday) ...[
+                                          const SizedBox(width: 6),
+                                          _todayBadge(context),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '周${_weekdayNames[day.weekday] ?? ''}',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: isWeekend || isHoli
+                                                ? Colors.red.shade400
+                                                : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          lunarFull,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                        if (isHoli && holiday != null) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.shade50,
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              holiday.name,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.red.shade700,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => Navigator.pop(ctx),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        if (events.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Center(
+                              child: Text(
+                                '暂无日程',
+                                style: TextStyle(color: Colors.grey, fontSize: 16),
                               ),
                             ),
-                            title: Text(
-                              event.title,
-                              style: const TextStyle(fontWeight: FontWeight.w500),
-                            ),
-                            subtitle: Text(
-                              isAllDay
-                                  ? '全天'
-                                  : event.location != null && event.location!.isNotEmpty
-                                      ? '$startStr - $endStr  ·  ${event.location}'
-                                      : '$startStr - $endStr',
-                            ),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _showEditScheduleDialog(context, event);
-                            },
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              onPressed: () {
-                                _deleteSchedule(event);
-                                Navigator.pop(ctx);
+                          )
+                        else
+                          Flexible(
+                            child: ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 72),
+                              shrinkWrap: true,
+                              itemCount: events.length,
+                              itemBuilder: (context, index) {
+                                final event = events[index];
+                                final startStr = DateFormat('HH:mm').format(event.startTime);
+                                final endStr = DateFormat('HH:mm').format(event.endTime);
+                                final isAllDay = event.startTime.hour == 0 && event.endTime.hour == 23;
+
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: ListTile(
+                                    leading: Checkbox(
+                                      value: event.completed,
+                                      onChanged: (v) {
+                                        context.read<ScheduleService>().toggleCompleted(event.localId);
+                                        setDialogState(() {});
+                                      },
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    title: Text(
+                                      event.title,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                        decoration: event.completed ? TextDecoration.lineThrough : null,
+                                        color: event.completed ? Colors.grey : null,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      isAllDay
+                                          ? '全天'
+                                          : event.location != null && event.location!.isNotEmpty
+                                              ? '$startStr - $endStr  ·  ${event.location}'
+                                              : '$startStr - $endStr',
+                                      style: TextStyle(
+                                        color: event.completed ? Colors.grey.shade400 : null,
+                                        decoration: event.completed ? TextDecoration.lineThrough : null,
+                                      ),
+                                    ),
+                                    onTap: () {
+                                      Navigator.pop(ctx);
+                                      _showEditScheduleDialog(context, event);
+                                    },
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                      onPressed: () {
+                                        _deleteSchedule(event);
+                                        Navigator.pop(ctx);
+                                      },
+                                    ),
+                                  ),
+                                );
                               },
                             ),
                           ),
-                        );
-                      },
+                      ],
                     ),
-                  ),
-              ],
-            ),
-          ),
+                    Positioned(
+                      right: 16,
+                      bottom: 16,
+                      child: FloatingActionButton(
+                        heroTag: 'day_events_fab_${day.toIso8601String()}',
+                        mini: true,
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          setState(() => _selectedDay = day);
+                          _showAddScheduleDialog(context);
+                        },
+                        child: const Icon(Icons.add),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -1134,6 +1163,9 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     final events = service.getSchedulesForDate(day);
     final isWeekend = day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
     final isHoli = holidayService.isHoliday(day);
+    final holiday = holidayService.isHolidayNameDay(day)
+        ? holidayService.getHoliday(day)
+        : null;
     final isToday = isSameDay(day, DateTime.now());
 
     // 全天日程
@@ -1246,13 +1278,15 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                     ),
                   ),
                   Text(
-                    _getLunarDayShort(day),
+                    holiday?.name ?? _getLunarDayShort(day),
                     style: TextStyle(
                       fontSize: 10,
                       color: isWeekend || isHoli
                           ? Colors.red.shade300
                           : Colors.grey.shade500,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ],
               ),
@@ -1438,10 +1472,25 @@ class SchedulesScreenState extends State<SchedulesScreen> {
         ? Colors.grey.shade400
         : isSelected
             ? Colors.white
-            : isWeekend || isHoliday
+            : isOutside
+                ? Colors.grey.shade400
+                : isWeekend || isHoliday
+                    ? Colors.red.shade400
+                    : null;
+    final subTextColor = isDisabled
+        ? Colors.grey.shade400
+        : isOutside
+            ? Colors.grey.shade400
+            : isHoliday
                 ? Colors.red.shade400
-                : null;
+                : isWeekend
+                    ? Colors.red.shade400
+                    : Colors.grey.shade600;
     final lunarDay = _getLunarDayShort(date);
+    final holiday = holidayService.isHolidayNameDay(date)
+        ? holidayService.getHoliday(date)
+        : null;
+    final subText = holiday?.name ?? lunarDay;
 
     return Container(
       margin: const EdgeInsets.all(2),
@@ -1505,13 +1554,15 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                     ],
                   ),
                 ),
-                if (lunarDay.isNotEmpty)
+                if (subText.isNotEmpty)
                   Text(
-                    lunarDay,
+                    subText,
                     style: TextStyle(
                       fontSize: 9,
-                      color: textColor?.withValues(alpha: 0.7) ?? Colors.grey.shade500,
+                      color: subTextColor,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
               ],
             ),

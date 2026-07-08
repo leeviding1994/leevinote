@@ -6,6 +6,7 @@ import 'package:leevinote/screens/alarms_screen.dart';
 import 'package:leevinote/screens/music_screen.dart';
 import 'package:leevinote/screens/videos_screen.dart';
 import 'package:leevinote/screens/schedules_screen.dart';
+import 'package:leevinote/screens/transactions_screen.dart';
 import 'package:leevinote/screens/profile_screen.dart';
 import 'package:leevinote/screens/settings_screen.dart';
 import 'package:leevinote/services/auth_service.dart';
@@ -26,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _musicKey = GlobalKey<MusicScreenState>();
   final _videosKey = GlobalKey<VideosScreenState>();
   final _schedulesKey = GlobalKey<SchedulesScreenState>();
+  final _transactionsKey = GlobalKey<TransactionsScreenState>();
   final Set<String> _expandedFolders = {};
 
   @override
@@ -53,6 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final selectedModuleId = ids.isNotEmpty ? ids[_currentIndex] : 'notes';
     final isNotes = selectedModuleId == 'notes';
     final isSchedules = selectedModuleId == 'schedules';
+    final isTransactions = selectedModuleId == 'transactions';
     final isProfile = selectedModuleId == 'profile';
 
     // 构建标题
@@ -118,6 +121,13 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () => _videosKey.currentState?.sync(),
       ));
     }
+    if (selectedModuleId == 'transactions') {
+      actions.add(IconButton(
+        icon: const Icon(Icons.sync),
+        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+        onPressed: () => _transactionsKey.currentState?.sync(),
+      ));
+    }
 
     // 构建 IndexedStack children
     final widgetMap = {
@@ -126,6 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'music': MusicScreen(key: _musicKey),
       'videos': VideosScreen(key: _videosKey),
       'schedules': SchedulesScreen(key: _schedulesKey),
+      'transactions': TransactionsScreen(key: _transactionsKey),
       'profile': const ProfileScreen(),
     };
     final children = ids.map((id) => widgetMap[id]!).toList();
@@ -149,7 +160,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: const Icon(Icons.add),
             )
-          : null,
+          : isTransactions
+              ? FloatingActionButton(
+                  heroTag: 'transactions_fab',
+                  backgroundColor: Colors.orange.shade500,
+                  foregroundColor: Colors.white,
+                  onPressed: () => _transactionsKey.currentState?.openEditor(null),
+                  child: const Icon(Icons.add),
+                )
+              : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {

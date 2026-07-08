@@ -28,6 +28,7 @@ dependencies:
   flutter_quill: 11.0.0
   dart_quill_delta: 10.8.3
   table_calendar: ^3.0.9
+  fl_chart: ^0.70.0
 
   # Media Players
   just_audio: ^0.9.36

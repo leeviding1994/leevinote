@@ -227,6 +227,22 @@ class AlarmsScreenState extends State<AlarmsScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
+                        if (isEditing) ...[
+                          Row(
+                            children: [
+                              const Text('当前类型：', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                              Text(
+                                repeatPattern ?? '单次',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         // 时间直接显示滚轮选择器
                         SizedBox(
                           height: 180,

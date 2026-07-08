@@ -67,7 +67,9 @@ lib/
 │   ├── alarm.dart
 │   ├── music.dart
 │   ├── video.dart
-│   └── schedule.dart
+│   ├── schedule.dart
+│   ├── transaction.dart
+│   └── transaction_category.dart
 ├── screens/              # 页面
 │   ├── login_screen.dart
 │   ├── home_screen.dart
@@ -75,7 +77,10 @@ lib/
 │   ├── alarms_screen.dart
 │   ├── music_screen.dart
 │   ├── videos_screen.dart
-│   └── schedules_screen.dart
+│   ├── schedules_screen.dart
+│   ├── transactions_screen.dart
+│   ├── transaction_editor_screen.dart
+│   └── transaction_category_manager_screen.dart
 ├── services/             # 服务层
 │   ├── api_service.dart  # API调用
 │   └── auth_service.dart # 认证管理
@@ -93,6 +98,7 @@ lib/
 - 🚧 音乐播放（开发中）
 - 🚧 视频播放（开发中）
 - 🚧 日程安排（开发中）
+- ✅ 记账管理（支出/收入、分类、日/月/年统计）
 
 ## 平台支持
 
