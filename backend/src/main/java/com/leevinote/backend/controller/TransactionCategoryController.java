@@ -38,12 +38,17 @@ public class TransactionCategoryController {
 
     @PutMapping("/{id}")
     public ResponseEntity<TransactionCategory> updateCategory(@PathVariable Long id, @RequestBody TransactionCategory category) {
+        Long userId = getCurrentUserId();
+        User user = new User();
+        user.setId(userId);
+        category.setUser(user);
         return ResponseEntity.ok(categoryService.updateCategory(id, category));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteCategory(@PathVariable Long id) {
-        categoryService.deleteCategory(id);
+        Long userId = getCurrentUserId();
+        categoryService.deleteCategory(userId, id);
         return ResponseEntity.ok(Map.of("message", "Transaction category deleted"));
     }
 

@@ -5,6 +5,7 @@ import 'package:leevinote/models/transaction.dart';
 import 'package:leevinote/models/transaction_category.dart';
 import 'package:leevinote/services/local_transaction_service.dart';
 import 'package:leevinote/services/local_transaction_category_service.dart';
+import 'package:leevinote/services/transaction_service.dart';
 import 'package:leevinote/screens/transaction_category_manager_screen.dart';
 
 class TransactionEditorScreen extends StatefulWidget {
@@ -54,6 +55,30 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     if (picked != null) {
       setState(() => _transactionDate = picked);
     }
+  }
+
+  Future<void> _delete() async {
+    final service = context.read<TransactionService>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除记录'),
+        content: const Text('确定要删除这条记录吗？删除后无法恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await service.deleteTransaction(widget.transaction!.localId);
+    if (mounted) Navigator.pop(context, true);
   }
 
   Future<void> _save() async {
@@ -114,6 +139,12 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
       appBar: AppBar(
         title: Text(widget.transaction == null ? '记一笔' : '编辑记录'),
         actions: [
+          if (widget.transaction != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: '删除',
+              onPressed: _delete,
+            ),
           TextButton(
             onPressed: _save,
             child: const Text('保存', style: TextStyle(fontSize: 16)),

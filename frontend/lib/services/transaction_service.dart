@@ -168,16 +168,25 @@ class TransactionService extends ChangeNotifier {
               final category = await _categoryLocal.getCategory(transaction.localCategoryId!);
               resolvedCategoryId = category?.id;
             }
-            final result = await _api.post(
-              ApiConstants.transactions,
-              transaction.copyWith(categoryId: () => resolvedCategoryId).toRemoteJson(),
-            );
+            final payload = transaction.copyWith(categoryId: () => resolvedCategoryId).toRemoteJson();
+            final Map<String, dynamic> result;
+            if (transaction.id != null) {
+              result = await _api.put(
+                '${ApiConstants.transactions}/${transaction.id}',
+                payload,
+              );
+            } else {
+              result = await _api.post(
+                ApiConstants.transactions,
+                payload,
+              );
+            }
             final remoteId = result['id'];
             final newId = remoteId is int
                 ? remoteId
                 : int.tryParse(remoteId?.toString() ?? '');
             await _local.updateTransaction(transaction.copyWith(
-              id: newId,
+              id: newId ?? transaction.id,
               categoryId: () => resolvedCategoryId,
               syncStatus: 'synced',
             ));

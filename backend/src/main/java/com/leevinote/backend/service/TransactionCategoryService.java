@@ -26,6 +26,9 @@ public class TransactionCategoryService {
     public TransactionCategory updateCategory(Long id, TransactionCategory updated) {
         TransactionCategory category = categoryRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Transaction category not found: " + id));
+        if (updated.getUser() != null && !updated.getUser().getId().equals(category.getUser().getId())) {
+            throw new RuntimeException("Transaction category does not belong to current user");
+        }
         category.setType(updated.getType());
         category.setName(updated.getName());
         category.setIcon(updated.getIcon());
@@ -33,9 +36,12 @@ public class TransactionCategoryService {
         return categoryRepository.save(category);
     }
 
-    public void deleteCategory(Long id) {
+    public void deleteCategory(Long userId, Long id) {
         TransactionCategory category = categoryRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Transaction category not found: " + id));
+        if (!category.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Transaction category does not belong to current user");
+        }
         category.setIsDeleted(true);
         categoryRepository.save(category);
     }

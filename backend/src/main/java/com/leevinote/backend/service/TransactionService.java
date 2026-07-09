@@ -35,6 +35,9 @@ public class TransactionService {
     public Transaction updateTransaction(Long id, Transaction updated) {
         Transaction transaction = transactionRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Transaction not found: " + id));
+        if (updated.getUser() != null && !updated.getUser().getId().equals(transaction.getUser().getId())) {
+            throw new RuntimeException("Transaction does not belong to current user");
+        }
         transaction.setType(updated.getType());
         transaction.setAmount(updated.getAmount());
         transaction.setTransactionDate(updated.getTransactionDate());
@@ -43,9 +46,12 @@ public class TransactionService {
         return transactionRepository.save(transaction);
     }
 
-    public void deleteTransaction(Long id) {
+    public void deleteTransaction(Long userId, Long id) {
         Transaction transaction = transactionRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Transaction not found: " + id));
+        if (!transaction.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Transaction does not belong to current user");
+        }
         transaction.setIsDeleted(true);
         transactionRepository.save(transaction);
     }

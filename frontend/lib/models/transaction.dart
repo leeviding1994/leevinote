@@ -112,11 +112,13 @@ class Transaction {
   }
 
   Map<String, dynamic> toRemoteJson() {
+    final date = transactionDate;
+    final dateString = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     return {
       if (id != null) 'id': id,
       'type': type,
       'amount': amount,
-      'transaction_date': transactionDate.toIso8601String(),
+      'transaction_date': dateString,
       'category_id': categoryId,
       'note': note,
     };

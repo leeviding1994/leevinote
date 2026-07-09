@@ -440,9 +440,13 @@ class TransactionsScreenState extends State<TransactionsScreen> {
         children: [
           const Text('结余', style: TextStyle(fontSize: 14, color: Colors.white70)),
           const SizedBox(height: 8),
-          Text(
-            '¥ ${balance >= 0 ? '' : '-'}${_amountFormat.format(balance.abs())}',
-            style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '¥ ${balance >= 0 ? '' : '-'}${_amountFormat.format(balance.abs())}',
+              style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
           ),
           const SizedBox(height: 20),
           Row(
@@ -479,6 +483,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
         ButtonSegment(value: _TransactionView.year, label: Text('年')),
       ],
       selected: {_view},
+      showSelectedIcon: false,
       style: SegmentedButton.styleFrom(
         visualDensity: VisualDensity.compact,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -502,11 +507,16 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
           onPressed: _previousRange,
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Text(
-            _rangeLabel,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        Flexible(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text(
+              _rangeLabel,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
         IconButton(
@@ -523,8 +533,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     final hasFilter = _filterType != null || _filterLocalCategoryId != null || _sortBy != 'date_desc';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
         children: [
           TextButton.icon(
             onPressed: _showFilterBottomSheet,
@@ -535,7 +546,6 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             ),
             label: const Text('筛选'),
           ),
-          const SizedBox(width: 24),
           TextButton.icon(
             onPressed: _openCategoryManager,
             icon: const Icon(Icons.category, size: 18),
@@ -617,9 +627,13 @@ class TransactionsScreenState extends State<TransactionsScreen> {
         children: [
           Text(label, style: const TextStyle(fontSize: 14, color: Colors.white70)),
           const SizedBox(height: 8),
-          Text(
-            '¥ ${isBalancePositive ? '' : '-'}${_amountFormat.format(balance.abs())}',
-            style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '¥ ${isBalancePositive ? '' : '-'}${_amountFormat.format(balance.abs())}',
+              style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
           ),
           const SizedBox(height: 20),
           Row(
@@ -640,7 +654,16 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   Widget _buildHeroStat(String label, String value, Color color) {
     return Column(
       children: [
-        Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 110),
+          child: Text(
+            value,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ),
         const SizedBox(height: 4),
         Text(label, style: TextStyle(fontSize: 12, color: color.withValues(alpha: 0.7))),
       ],
@@ -1501,7 +1524,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             ),
           ),
           if (dailyIncome > 0 || dailyExpense > 0)
-            _buildDaySummaryLabels(dailyIncome, dailyExpense),
+            Flexible(
+              child: _buildDaySummaryLabels(dailyIncome, dailyExpense),
+            ),
         ],
       ),
     );
@@ -1530,7 +1555,12 @@ class TransactionsScreenState extends State<TransactionsScreen> {
         ),
       ]);
     }
-    return Text.rich(TextSpan(children: children));
+    return Text.rich(
+      TextSpan(children: children),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.right,
+    );
   }
 
   String _formatDayHeader(DateTime date) {
@@ -1588,16 +1618,22 @@ class TransactionsScreenState extends State<TransactionsScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${isExpense ? '-' : '+'}${_amountFormat.format(t.amount)}',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: amountColor),
-                ),
-                if (t.syncStatus != 'synced')
-                  Icon(Icons.cloud_off, size: 12, color: Theme.of(context).colorScheme.outline),
-              ],
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 120),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${isExpense ? '-' : '+'}${_amountFormat.format(t.amount)}',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: amountColor),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                  ),
+                  if (t.syncStatus != 'synced')
+                    Icon(Icons.cloud_off, size: 12, color: Theme.of(context).colorScheme.outline),
+                ],
+              ),
             ),
           ],
         ),

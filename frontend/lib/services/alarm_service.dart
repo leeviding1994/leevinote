@@ -163,14 +163,14 @@ class AlarmService extends ChangeNotifier {
       await _notificationsPlugin?.cancel(id: _notificationId(alarm));
     }
     if (alarm.id != null) {
+      // 已同步的闹钟：本地标记为删除（同步时上传到服务端），同时立即从列表移除
       final updated = alarm.copyWith(syncStatus: 'deleted');
       await _local.updateAlarm(updated);
-      final index = _alarms.indexWhere((a) => a.localId == localId);
-      if (index != -1) _alarms[index] = updated;
     } else {
+      // 未同步的闹钟：直接从本地删除
       await _local.deleteAlarm(localId);
-      _alarms.removeWhere((a) => a.localId == localId);
     }
+    _alarms.removeWhere((a) => a.localId == localId);
     notifyListeners();
   }
 

@@ -42,12 +42,17 @@ public class TransactionController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Transaction> updateTransaction(@PathVariable Long id, @RequestBody Transaction transaction) {
+        Long userId = getCurrentUserId();
+        User user = new User();
+        user.setId(userId);
+        transaction.setUser(user);
         return ResponseEntity.ok(transactionService.updateTransaction(id, transaction));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteTransaction(@PathVariable Long id) {
-        transactionService.deleteTransaction(id);
+        Long userId = getCurrentUserId();
+        transactionService.deleteTransaction(userId, id);
         return ResponseEntity.ok(Map.of("message", "Transaction deleted"));
     }
 

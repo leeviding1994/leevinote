@@ -36,11 +36,15 @@ class NotesScreenState extends State<NotesScreen> {
       await context.read<LocalFolderService>().ensureLoaded();
       await _updateFilteredNotes();
     });
+    context.read<LocalNoteService>().addListener(_updateFilteredNotes);
+    context.read<LocalFolderService>().addListener(_updateFilteredNotes);
   }
 
   @override
   void dispose() {
     _searchC.dispose();
+    context.read<LocalNoteService>().removeListener(_updateFilteredNotes);
+    context.read<LocalFolderService>().removeListener(_updateFilteredNotes);
     super.dispose();
   }
 
@@ -849,10 +853,6 @@ class NotesScreenState extends State<NotesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch services to trigger rebuilds when data changes
-    context.watch<LocalNoteService>();
-    context.watch<LocalFolderService>();
-
     final filtered = _filteredNotes;
     final childFolders = _searchC.text.isEmpty ? _childFolders : <Folder>[];
     final totalItems = childFolders.length + filtered.length;
