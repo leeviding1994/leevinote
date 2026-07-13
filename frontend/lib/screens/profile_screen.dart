@@ -3,8 +3,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:leevinote/design/app_theme.dart';
 import 'package:leevinote/services/auth_service.dart';
-import 'package:leevinote/screens/login_screen.dart';
+import 'package:leevinote/widgets/widgets.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -29,7 +31,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
 
-    return Scaffold(
+    return AppScaffold.noPadding(
+      appBar: const AppAppBar(title: '我的'),
       body: auth.isAuthenticated
           ? _buildAuthenticatedProfile(auth)
           : _buildUnauthenticatedProfile(),
@@ -37,82 +40,91 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildAuthenticatedProfile(AuthService auth) {
-    final theme = Theme.of(context);
     _nicknameController.text = auth.nickname ?? '';
     _emailController.text = auth.email ?? '';
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
       children: [
-        // 头像区域
         Center(
           child: Column(
             children: [
-              const SizedBox(height: 16),
               _buildAvatar(auth),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.lg),
               Text(
                 auth.displayName,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: AppTypography.h2Light(),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 auth.username ?? '',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
+                style: AppTypography.captionLight(),
               ),
-              const SizedBox(height: 16),
-              // 编辑/保存按钮
-              OutlinedButton.icon(
-                onPressed: () {
-                  if (_isEditing) {
-                    _saveProfile(auth);
-                  }
-                  setState(() => _isEditing = !_isEditing);
-                },
-                icon: Icon(_isEditing ? Icons.save : Icons.edit),
-                label: Text(_isEditing ? '保存' : '编辑资料'),
+              const SizedBox(height: AppSpacing.lg),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+                child: AppButton.secondary(
+                  label: _isEditing ? '保存' : '编辑资料',
+                  icon: _isEditing ? Icons.save : Icons.edit,
+                  onPressed: () {
+                    if (_isEditing) _saveProfile(auth);
+                    setState(() => _isEditing = !_isEditing);
+                  },
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 24),
-        const Divider(),
-        // 信息列表
-        if (_isEditing) ...[
-          _buildTextField(
-            label: '昵称',
-            controller: _nicknameController,
-            icon: Icons.person_outline,
+        const SizedBox(height: AppSpacing.xxl),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            boxShadow: Theme.of(context).brightness == Brightness.dark
+                ? AppShadows.dark
+                : AppShadows.light,
           ),
-          _buildTextField(
-            label: '邮箱',
-            controller: _emailController,
-            icon: Icons.email_outlined,
-            keyboardType: TextInputType.emailAddress,
+          child: Column(
+            children: [
+              if (_isEditing) ...[
+                _buildTextField(
+                  label: '昵称',
+                  controller: _nicknameController,
+                  icon: Icons.person_outline,
+                ),
+                const Divider(height: 1, indent: AppSpacing.pageHorizontal),
+                _buildTextField(
+                  label: '邮箱',
+                  controller: _emailController,
+                  icon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+              ] else ...[
+                _buildInfoTile(
+                  icon: Icons.person_outline,
+                  title: '昵称',
+                  value: auth.nickname ?? '未设置',
+                ),
+                const Divider(height: 1, indent: AppSpacing.pageHorizontal),
+                _buildInfoTile(
+                  icon: Icons.email_outlined,
+                  title: '邮箱',
+                  value: auth.email ?? '未设置',
+                ),
+              ],
+            ],
           ),
-        ] else ...[
-          _buildInfoTile(
-            icon: Icons.person_outline,
-            title: '昵称',
-            value: auth.nickname ?? '未设置',
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+          child: AppButton(
+            label: '退出登录',
+            destructive: true,
+            icon: Icons.logout,
+            onPressed: _confirmLogout,
           ),
-          _buildInfoTile(
-            icon: Icons.email_outlined,
-            title: '邮箱',
-            value: auth.email ?? '未设置',
-          ),
-        ],
-        const SizedBox(height: 24),
-        const Divider(),
-        // 退出登录
-        ListTile(
-          leading: const Icon(Icons.logout, color: Colors.red),
-          title: const Text('退出登录', style: TextStyle(color: Colors.red)),
-          onTap: () => _confirmLogout(),
         ),
       ],
     );
@@ -130,14 +142,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Stack(
       children: [
-        CircleAvatar(
-          radius: 48,
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          backgroundImage: imageBytes != null ? MemoryImage(imageBytes) : null,
+        Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            image: imageBytes != null
+                ? DecorationImage(
+                    image: MemoryImage(imageBytes),
+                    fit: BoxFit.cover,
+                  )
+                : null,
+          ),
           child: imageBytes == null
               ? Icon(
                   Icons.person,
-                  size: 48,
+                  size: 44,
                   color: Theme.of(context).colorScheme.primary,
                 )
               : null,
@@ -149,10 +170,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: GestureDetector(
               onTap: _pickAvatar,
               child: Container(
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primary,
                   shape: BoxShape.circle,
+                  boxShadow: AppShadows.light,
                 ),
                 child: const Icon(
                   Icons.camera_alt,
@@ -167,6 +189,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickAvatar() async {
+    final auth = context.read<AuthService>();
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       allowMultiple: false,
@@ -177,9 +200,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final bytes = result.files.first.bytes;
     if (bytes == null || bytes.isEmpty) return;
 
-    // 压缩提示：如果图片太大，简单裁剪
     final base64Str = base64Encode(bytes);
-    await context.read<AuthService>().updateProfile(avatarBase64: base64Str);
+    if (!mounted) return;
+    await auth.updateProfile(avatarBase64: base64Str);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('头像已更新')),
@@ -194,15 +217,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     TextInputType? keyboardType,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextField(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: AppInput(
         controller: controller,
+        hintText: label,
+        prefixIcon: Icon(icon, size: 20),
         keyboardType: keyboardType,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon),
-          border: const OutlineInputBorder(),
-        ),
       ),
     );
   }
@@ -212,10 +232,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String title,
     required String value,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.grey.shade600),
-      title: Text(title),
-      subtitle: Text(value),
+    return AppListTile(
+      leading: Icon(icon, color: AppColors.secondaryText),
+      title: title,
+      subtitle: value,
     );
   }
 
@@ -232,68 +252,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _confirmLogout() {
-    showDialog(
+    AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('退出登录'),
-        content: const Text('确定要退出登录吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              context.read<AuthService>().logout();
-              Navigator.pop(ctx);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('退出'),
-          ),
-        ],
-      ),
-    );
+      title: '退出登录',
+      content: '确定要退出登录吗？',
+      confirmLabel: '退出',
+      destructive: true,
+    ).then((confirmed) {
+      if (confirmed == true && mounted) {
+        context.read<AuthService>().logout();
+      }
+    });
   }
 
   Widget _buildUnauthenticatedProfile() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.account_circle,
-              size: 80,
-              color: Colors.grey.shade400,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '未登录',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '登录后可同步数据和管理个人信息',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: FilledButton.icon(
-                onPressed: () => _goLogin(),
-                icon: const Icon(Icons.login),
-                label: const Text('登录 / 注册'),
-              ),
-            ),
-          ],
-        ),
+    return AppEmptyState(
+      icon: Icons.account_circle,
+      title: '未登录',
+      subtitle: '登录后可同步数据和管理个人信息',
+      action: AppButton(
+        label: '登录 / 注册',
+        icon: Icons.login,
+        onPressed: _goLogin,
       ),
     );
   }
@@ -301,7 +281,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _goLogin() async {
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      AppPageRoute(builder: (_) => const LoginScreen()),
     );
     if (result == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

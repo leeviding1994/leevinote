@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:leevinote/design/app_theme.dart';
 import 'package:leevinote/models/transaction.dart';
 import 'package:leevinote/models/transaction_category.dart';
 import 'package:leevinote/services/api_service.dart';
@@ -10,9 +11,10 @@ import 'package:leevinote/services/local_transaction_service.dart';
 import 'package:leevinote/services/local_transaction_category_service.dart';
 import 'package:leevinote/services/transaction_service.dart';
 import 'package:leevinote/services/transaction_category_service.dart';
-import 'package:leevinote/screens/login_screen.dart';
-import 'package:leevinote/screens/transaction_editor_screen.dart';
-import 'package:leevinote/screens/transaction_category_manager_screen.dart';
+import 'package:leevinote/widgets/widgets.dart';
+import 'login_screen.dart';
+import 'transaction_editor_screen.dart';
+import 'transaction_category_manager_screen.dart';
 
 enum _TransactionView { day, month, year }
 
@@ -48,12 +50,17 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
   Future<void> _loadData() async {
     setState(() => _loading = true);
-    final localService = context.read<LocalTransactionService>();
-    final categoryService = context.read<LocalTransactionCategoryService>();
-    await localService.ensureLoaded();
-    await categoryService.ensureLoaded();
-    await _refreshData();
-    setState(() => _loading = false);
+    try {
+      final localService = context.read<LocalTransactionService>();
+      final categoryService = context.read<LocalTransactionCategoryService>();
+      await localService.ensureLoaded();
+      await categoryService.ensureLoaded();
+      await _refreshData();
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   Future<void> _refreshData() async {
@@ -61,6 +68,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     final categoryService = context.read<LocalTransactionCategoryService>();
     await localService.ensureLoaded();
     await categoryService.ensureLoaded();
+    if (!mounted) return;
 
     var transactions = List<Transaction>.from(localService.transactions)
       ..sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
@@ -147,7 +155,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   Future<void> openEditor(Transaction? transaction) async {
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(
+      AppPageRoute(
         builder: (_) => TransactionEditorScreen(transaction: transaction),
       ),
     );
@@ -159,26 +167,24 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   Future<void> _openCategoryManager() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const TransactionCategoryManagerScreen()),
+      AppPageRoute(builder: (_) => const TransactionCategoryManagerScreen()),
     );
+    if (!mounted) return;
     await _refreshData();
   }
 
   Future<void> _deleteTransaction(Transaction transaction) async {
     final service = context.read<TransactionService>();
-    final confirm = await showDialog<bool>(
+    final confirm = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除记录'),
-        content: const Text('确定要删除这条记录吗？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定')),
-        ],
-      ),
+      title: '删除记录',
+      content: '确定要删除这条记录吗？',
+      confirmLabel: '删除',
+      destructive: true,
     );
     if (confirm == true) {
       await service.deleteTransaction(transaction.localId);
+      if (!mounted) return;
       await _refreshData();
     }
   }
@@ -191,7 +197,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     if (!auth.isAuthenticated) {
       final loggedIn = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        AppPageRoute(builder: (_) => const LoginScreen()),
       );
       if (loggedIn != true) return;
     }
@@ -206,7 +212,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           const SnackBar(
             content: Text('同步完成'),
             behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.fromLTRB(16, 0, 16, 80),
+            margin: EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
           ),
         );
       }
@@ -216,7 +222,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           SnackBar(
             content: Text('同步失败: $e'),
             behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+            margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
           ),
         );
       }
@@ -247,10 +253,10 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             return SafeArea(
               child: Padding(
                 padding: EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  top: 16,
-                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+                  left: AppSpacing.pageHorizontal,
+                  right: AppSpacing.pageHorizontal,
+                  top: AppSpacing.xl,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xl,
                 ),
                 child: SingleChildScrollView(
                   child: Column(
@@ -260,31 +266,33 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('筛选与排序', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                          TextButton(
-                            onPressed: () {
-                              setSheetState(() {
-                                _filterType = null;
-                                _filterLocalCategoryId = null;
-                                _sortBy = 'date_desc';
-                              });
-                            },
-                            child: const Text('重置'),
+                          Text('筛选与排序', style: AppTypography.h2Light()),
+                          AppButton.secondary(
+                            label: '重置',
+                            width: null,
+                            height: 36,
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                            onPressed: () => setSheetState(() {
+                              _filterType = null;
+                              _filterLocalCategoryId = null;
+                              _sortBy = 'date_desc';
+                            }),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      const Text('类型', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.lg),
+                      Text('类型', style: AppTypography.captionMediumLight()),
+                      const SizedBox(height: AppSpacing.sm),
                       Wrap(
-                        spacing: 8,
+                        spacing: AppSpacing.md,
+                        runSpacing: AppSpacing.md,
                         children: [
-                          _FilterChip(
+                          AppChip(
                             label: '全部',
                             selected: _filterType == null,
                             onSelected: (_) => setSheetState(() => _filterType = null),
                           ),
-                          _FilterChip(
+                          AppChip(
                             label: '支出',
                             selected: _filterType == 'expense',
                             onSelected: (_) => setSheetState(() {
@@ -292,7 +300,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                               _filterLocalCategoryId = null;
                             }),
                           ),
-                          _FilterChip(
+                          AppChip(
                             label: '收入',
                             selected: _filterType == 'income',
                             onSelected: (_) => setSheetState(() {
@@ -302,16 +310,14 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      const Text('分类', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.lg),
                       if (expenseCategories.isNotEmpty) ...[
-                        Text('支出', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                        const SizedBox(height: 4),
+                        Text('支出', style: AppTypography.smallLight()),
+                        const SizedBox(height: AppSpacing.sm),
                         Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: expenseCategories.map((c) => _FilterChip(
+                          spacing: AppSpacing.md,
+                          runSpacing: AppSpacing.md,
+                          children: expenseCategories.map((c) => AppChip(
                             label: c.name,
                             selected: _filterLocalCategoryId == c.localId,
                             onSelected: (_) => setSheetState(() {
@@ -320,15 +326,15 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                             }),
                           )).toList(),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                       ],
                       if (incomeCategories.isNotEmpty) ...[
-                        Text('收入', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                        const SizedBox(height: 4),
+                        Text('收入', style: AppTypography.smallLight()),
+                        const SizedBox(height: AppSpacing.sm),
                         Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: incomeCategories.map((c) => _FilterChip(
+                          spacing: AppSpacing.md,
+                          runSpacing: AppSpacing.md,
+                          children: incomeCategories.map((c) => AppChip(
                             label: c.name,
                             selected: _filterLocalCategoryId == c.localId,
                             onSelected: (_) => setSheetState(() {
@@ -337,45 +343,43 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                             }),
                           )).toList(),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                       ],
-                      const Text('排序', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
+                      Text('排序', style: AppTypography.captionMediumLight()),
+                      const SizedBox(height: AppSpacing.sm),
                       Wrap(
-                        spacing: 8,
+                        spacing: AppSpacing.md,
+                        runSpacing: AppSpacing.md,
                         children: [
-                          _FilterChip(
+                          AppChip(
                             label: '时间倒序',
                             selected: _sortBy == 'date_desc',
                             onSelected: (_) => setSheetState(() => _sortBy = 'date_desc'),
                           ),
-                          _FilterChip(
+                          AppChip(
                             label: '时间正序',
                             selected: _sortBy == 'date_asc',
                             onSelected: (_) => setSheetState(() => _sortBy = 'date_asc'),
                           ),
-                          _FilterChip(
+                          AppChip(
                             label: '金额从高到低',
                             selected: _sortBy == 'amount_desc',
                             onSelected: (_) => setSheetState(() => _sortBy = 'amount_desc'),
                           ),
-                          _FilterChip(
+                          AppChip(
                             label: '金额从低到高',
                             selected: _sortBy == 'amount_asc',
                             onSelected: (_) => setSheetState(() => _sortBy = 'amount_asc'),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            _refreshData();
-                          },
-                          child: const Text('确定'),
-                        ),
+                      const SizedBox(height: AppSpacing.xl),
+                      AppButton(
+                        label: '确定',
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _refreshData();
+                        },
                       ),
                     ],
                   ),
@@ -400,7 +404,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
         else
           _buildSummaryHeroCard(),
         _buildDayControls(),
-        if (_view != _TransactionView.month) _buildActionsBar(),
+        if (_view == _TransactionView.day) _buildActionsBar(),
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
@@ -425,30 +429,36 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     final balance = income - expense;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.pageHorizontal,
+        AppSpacing.sm,
+        AppSpacing.pageHorizontal,
+        AppSpacing.md,
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [Color(0xFF5B4DBE), Color(0xFF7B5CFA)],
         ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: AppShadows.light,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('结余', style: TextStyle(fontSize: 14, color: Colors.white70)),
-          const SizedBox(height: 8),
+          Text('结余', style: AppTypography.captionLight(color: Colors.white70)),
+          const SizedBox(height: AppSpacing.sm),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
               '¥ ${balance >= 0 ? '' : '-'}${_amountFormat.format(balance.abs())}',
-              style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+              style: AppTypography.h1Light(color: Colors.white),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.xl),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -464,11 +474,14 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
   Widget _buildDayControls() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.pageHorizontal,
+        vertical: AppSpacing.md,
+      ),
       child: Row(
         children: [
           _buildCompactViewSelector(),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(child: _buildCompactDateNavigator()),
         ],
       ),
@@ -501,28 +514,26 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left, size: 20),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+        AppIconButton(
+          icon: Icons.chevron_left,
+          iconSize: 20,
           onPressed: _previousRange,
         ),
         Flexible(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
             child: Text(
               _rangeLabel,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              style: AppTypography.bodyMediumLight(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
             ),
           ),
         ),
-        IconButton(
-          icon: const Icon(Icons.chevron_right, size: 20),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+        AppIconButton(
+          icon: Icons.chevron_right,
+          iconSize: 20,
           onPressed: _nextRange,
         ),
       ],
@@ -532,24 +543,24 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   Widget _buildActionsBar() {
     final hasFilter = _filterType != null || _filterLocalCategoryId != null || _sortBy != 'date_desc';
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.pageHorizontal,
+        vertical: AppSpacing.xs,
+      ),
       child: Wrap(
         alignment: WrapAlignment.center,
-        spacing: 8,
+        spacing: AppSpacing.sm,
         children: [
-          TextButton.icon(
-            onPressed: _showFilterBottomSheet,
-            icon: Badge(
-              isLabelVisible: hasFilter,
-              smallSize: 8,
-              child: const Icon(Icons.filter_list, size: 18),
-            ),
-            label: const Text('筛选'),
+          AppChip(
+            label: '筛选',
+            icon: Icons.filter_list,
+            selected: hasFilter,
+            onSelected: (_) => _showFilterBottomSheet(),
           ),
-          TextButton.icon(
-            onPressed: _openCategoryManager,
-            icon: const Icon(Icons.category, size: 18),
-            label: const Text('分类管理'),
+          AppChip(
+            label: '分类管理',
+            icon: Icons.category,
+            onSelected: (_) => _openCategoryManager(),
           ),
         ],
       ),
@@ -580,7 +591,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return ListView(
-      padding: const EdgeInsets.only(bottom: 80),
+      padding: const EdgeInsets.only(bottom: 88),
       children: [
         ...sortedKeys.expand((key) {
           final items = grouped[key]!;
@@ -612,30 +623,36 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     final isBalancePositive = balance >= 0;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.pageHorizontal,
+        AppSpacing.sm,
+        AppSpacing.pageHorizontal,
+        AppSpacing.md,
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [Color(0xFF5B4DBE), Color(0xFF7B5CFA)],
         ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: AppShadows.light,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 14, color: Colors.white70)),
-          const SizedBox(height: 8),
+          Text(label, style: AppTypography.captionLight(color: Colors.white70)),
+          const SizedBox(height: AppSpacing.sm),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
               '¥ ${isBalancePositive ? '' : '-'}${_amountFormat.format(balance.abs())}',
-              style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+              style: AppTypography.h1Light(color: Colors.white),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.xl),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -658,14 +675,14 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           constraints: const BoxConstraints(maxWidth: 110),
           child: Text(
             value,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+            style: AppTypography.bodyMediumDark(color: color),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(label, style: TextStyle(fontSize: 12, color: color.withValues(alpha: 0.7))),
+        const SizedBox(height: AppSpacing.xs),
+        Text(label, style: AppTypography.smallLight(color: color.withValues(alpha: 0.7))),
       ],
     );
   }
@@ -673,8 +690,6 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   Widget _buildHeroDivider() {
     return Container(width: 1, height: 24, color: Colors.white24);
   }
-
-  // ---------------- 月视图分析 ----------------
 
   Widget _buildMonthAnalyticsView() {
     final (start, end) = _currentRange;
@@ -696,17 +711,17 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     final savingsRate = income > 0 ? balance / income : 0.0;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 80),
+      padding: const EdgeInsets.only(bottom: 88),
       child: Column(
         children: [
           _buildMonthSavingsRingCard(income: income, expense: expense, savingsRate: savingsRate),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.component),
           _buildExpenseCategoryCard(transactions),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.component),
           _buildMonthTrendCard(transactions),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.component),
           _buildMaxTransactionCards(transactions),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.component),
         ],
       ),
     );
@@ -741,13 +756,13 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     centerSpaceRadius: 42,
                     sections: [
                       PieChartSectionData(
-                        color: Colors.green.shade400,
+                        color: AppColors.success,
                         value: savingsValue,
                         radius: 18,
                         showTitle: false,
                       ),
                       PieChartSectionData(
-                        color: Colors.grey.shade300,
+                        color: AppColors.border,
                         value: expenseValue,
                         radius: 18,
                         showTitle: false,
@@ -761,31 +776,31 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                   children: [
                     Text(
                       '${savingsValue.toStringAsFixed(1)}%',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: AppTypography.h3Light(),
                     ),
-                    const Text('结余率', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    Text('结余率', style: AppTypography.smallLight()),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: AppSpacing.xl),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('本月支出', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                const SizedBox(height: 4),
+                Text('本月支出', style: AppTypography.captionLight()),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   '-¥ ${_amountFormat.format(expense)}',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.red.shade600),
+                  style: AppTypography.h2Light(color: AppColors.error),
                 ),
-                const SizedBox(height: 12),
-                Text('剩余时间', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.lg),
+                Text('剩余时间', style: AppTypography.captionLight()),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   '$remainingDays天',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: AppTypography.bodyMediumLight(),
                 ),
               ],
             ),
@@ -796,15 +811,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildSectionCard({required Widget child}) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: child,
-      ),
+    return AppCard(
+      shadows: const [],
+      child: child,
     );
   }
 
@@ -826,11 +835,11 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-              Text('总支出 -¥ ${_amountFormat.format(total)}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              Text(title, style: AppTypography.h3Light()),
+              Text('总支出 -¥ ${_amountFormat.format(total)}', style: AppTypography.smallLight()),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.lg),
           ...displayItems.asMap().entries.map((entry) {
             final index = entry.key;
             final item = entry.value;
@@ -846,9 +855,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           }),
           if (hasMore)
             Center(
-              child: TextButton(
+              child: AppButton.secondary(
+                label: _showAllExpenseCategories ? '收起' : '更多',
                 onPressed: () => setState(() => _showAllExpenseCategories = !_showAllExpenseCategories),
-                child: Text(_showAllExpenseCategories ? '收起' : '更多'),
               ),
             ),
         ],
@@ -864,19 +873,19 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }) {
     final percentage = total > 0 ? amount / total : 0.0;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            child: Icon(_parseIcon(category?.icon), color: color, size: 18),
+            child: Icon(_parseIcon(category?.icon), color: color, size: 20),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -884,20 +893,22 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(category?.name ?? '未分类', style: const TextStyle(fontSize: 14)),
+                    Text(category?.name ?? '未分类', style: AppTypography.bodyLight()),
                     Text(
                       '-${_amountFormat.format(amount)}',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.red.shade600),
+                      style: AppTypography.bodyMediumLight(color: AppColors.error),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                LinearProgressIndicator(
-                  value: percentage,
-                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  color: color,
-                  borderRadius: BorderRadius.circular(4),
-                  minHeight: 5,
+                const SizedBox(height: AppSpacing.sm),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
+                  child: LinearProgressIndicator(
+                    value: percentage,
+                    backgroundColor: AppColors.border,
+                    color: color,
+                    minHeight: 5,
+                  ),
                 ),
               ],
             ),
@@ -929,8 +940,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('每日收支走势', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 16),
+          Text('每日收支走势', style: AppTypography.h3Light()),
+          const SizedBox(height: AppSpacing.lg),
           SizedBox(
             height: 200,
             child: LineChart(
@@ -946,7 +957,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                       interval: maxY / 4,
                       getTitlesWidget: (value, meta) {
                         if (value == 0) return const SizedBox.shrink();
-                        return Text('¥${value.toInt()}', style: const TextStyle(fontSize: 9));
+                        return Text('¥${value.toInt()}', style: AppTypography.smallLight());
                       },
                     ),
                   ),
@@ -957,7 +968,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                       getTitlesWidget: (value, meta) {
                         final day = value.toInt() + 1;
                         if (day < 1 || day > daysInMonth) return const SizedBox.shrink();
-                        return Text('$day日', style: const TextStyle(fontSize: 9));
+                        return Text('$day日', style: AppTypography.smallLight());
                       },
                     ),
                   ),
@@ -966,17 +977,37 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 ),
                 borderData: FlBorderData(show: false),
                 lineBarsData: [
-                  _buildSmoothLine(dailyIncome, Colors.green.shade600),
-                  _buildSmoothLine(dailyExpense, Colors.red.shade600),
+                  _buildSmoothLine(dailyIncome, AppColors.success),
+                  _buildSmoothLine(dailyExpense, AppColors.error),
                 ],
                 lineTouchData: LineTouchData(
                   touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (_) => AppColors.primaryText,
+                    tooltipRoundedRadius: AppRadius.lg,
+                    tooltipPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
                     getTooltipItems: (touchedSpots) {
                       return touchedSpots.map((spot) {
                         final label = spot.barIndex == 0 ? '收入' : '支出';
+                        final color = spot.bar.color ?? AppColors.secondaryText;
                         return LineTooltipItem(
-                          '$label: ¥${spot.y.toStringAsFixed(0)}',
-                          TextStyle(color: spot.bar.color, fontWeight: FontWeight.bold, fontSize: 12),
+                          '',
+                          AppTypography.smallMediumLight(color: Colors.white),
+                          children: [
+                            TextSpan(
+                              text: '● ',
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 8,
+                                height: 1.2,
+                              ),
+                            ),
+                            TextSpan(text: '$label  ¥${spot.y.toStringAsFixed(0)}'),
+                          ],
                         );
                       }).toList();
                     },
@@ -985,13 +1016,13 @@ class TransactionsScreenState extends State<TransactionsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildLegendItem('收入', Colors.green.shade600),
-              const SizedBox(width: 16),
-              _buildLegendItem('支出', Colors.red.shade600),
+              _buildLegendItem('收入', AppColors.success),
+              const SizedBox(width: AppSpacing.lg),
+              _buildLegendItem('支出', AppColors.error),
             ],
           ),
         ],
@@ -1008,14 +1039,14 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     final maxExpense = expenseTransactions.isNotEmpty ? expenseTransactions.first : null;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
       child: Row(
         children: [
           if (maxIncome != null)
-            Expanded(child: _buildMaxTransactionCard('最大单笔收入', maxIncome, Colors.green.shade600)),
-          if (maxIncome != null && maxExpense != null) const SizedBox(width: 12),
+            Expanded(child: _buildMaxTransactionCard('最大单笔收入', maxIncome, AppColors.success)),
+          if (maxIncome != null && maxExpense != null) const SizedBox(width: AppSpacing.md),
           if (maxExpense != null)
-            Expanded(child: _buildMaxTransactionCard('最大单笔支出', maxExpense, Colors.red.shade600)),
+            Expanded(child: _buildMaxTransactionCard('最大单笔支出', maxExpense, AppColors.error)),
         ],
       ),
     );
@@ -1023,63 +1054,59 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
   Widget _buildMaxTransactionCard(String title, Transaction t, Color amountColor) {
     final category = _getCategory(t.localCategoryId);
-    final catColor = _parseColor(category?.color) ?? Colors.grey;
+    final catColor = _parseColor(category?.color) ?? AppColors.secondaryText;
 
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return AppCard(
+      shadows: const [],
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 10),
+            Text(title, style: AppTypography.smallLight()),
+            const SizedBox(height: AppSpacing.md),
             Row(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: catColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
-                  child: Icon(_parseIcon(category?.icon), color: catColor, size: 18),
+                  child: Icon(_parseIcon(category?.icon), color: catColor, size: 20),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         category?.name ?? (t.type == 'expense' ? '支出' : '收入'),
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                        style: AppTypography.bodyMediumLight(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         DateFormat('M月d日', 'zh_CN').format(t.transactionDate),
-                        style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        style: AppTypography.smallLight(),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.md),
             Text(
               '${t.type == 'expense' ? '-' : '+'}¥ ${_amountFormat.format(t.amount)}',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: amountColor),
+              style: AppTypography.h3Light(color: amountColor),
             ),
           ],
         ),
       ),
     );
   }
-
-  // ---------------- 年视图分析 ----------------
 
   Widget _buildYearAnalyticsView() {
     final (start, end) = _currentRange;
@@ -1103,19 +1130,19 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     final avgBalance = monthCount > 0 ? balance / monthCount : 0.0;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 80),
+      padding: const EdgeInsets.only(bottom: 88),
       child: Column(
         children: [
           _buildYearOverviewCard(monthCount: monthCount, avgExpense: avgExpense, avgBalance: avgBalance),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.component),
           _buildYearMonthListCard(transactions),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.component),
           _buildExpenseCategoryCard(transactions, title: '年度支出分类'),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.component),
           _buildIncomeCategoryCard(transactions),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.component),
           _buildYearTrendCard(transactions),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.component),
         ],
       ),
     );
@@ -1130,8 +1157,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('年度概览', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 12),
+          Text('年度概览', style: AppTypography.h3Light()),
+          const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
               Expanded(
@@ -1157,11 +1184,11 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 4),
+        Text(label, style: AppTypography.smallLight()),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           value,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          style: AppTypography.bodyMediumLight(),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -1190,8 +1217,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('各月概览', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 12),
+          Text('各月概览', style: AppTypography.h3Light()),
+          const SizedBox(height: AppSpacing.lg),
           ...List.generate(12, (index) {
             final income = monthlyData[index]['income'] ?? 0.0;
             final expense = monthlyData[index]['expense'] ?? 0.0;
@@ -1200,34 +1227,32 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             final ratio = maxAbs > 0 && hasData ? balance.abs() / maxAbs : 0.0;
             final isPositive = balance >= 0;
             return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
               child: Row(
                 children: [
                   SizedBox(
-                    width: 36,
-                    child: Text('${index + 1}月', style: const TextStyle(fontSize: 13)),
+                    width: 40,
+                    child: Text('${index + 1}月', style: AppTypography.bodyLight()),
                   ),
                   if (hasData) ...[
                     Container(
                       height: 6,
                       width: 24 * ratio,
                       decoration: BoxDecoration(
-                        color: isPositive ? Colors.green.shade400 : Colors.red.shade400,
-                        borderRadius: BorderRadius.circular(3),
+                        color: isPositive ? AppColors.success : AppColors.error,
+                        borderRadius: BorderRadius.circular(AppRadius.xs),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.md),
                   ] else
                     const SizedBox(width: 32),
                   Expanded(
                     child: Text(
                       hasData ? '${isPositive ? '+' : '-'}¥ ${_amountFormat.format(balance.abs())}' : '--',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                      style: AppTypography.bodyMediumLight(
                         color: hasData
-                            ? (isPositive ? Colors.green.shade600 : Colors.red.shade600)
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                            ? (isPositive ? AppColors.success : AppColors.error)
+                            : AppColors.tertiaryText,
                       ),
                     ),
                   ),
@@ -1256,11 +1281,11 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('收入来源', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-              Text('总收入 +¥ ${_amountFormat.format(total)}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              Text('收入来源', style: AppTypography.h3Light()),
+              Text('总收入 +¥ ${_amountFormat.format(total)}', style: AppTypography.smallLight()),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.lg),
           ...ranking.take(5).toList().asMap().entries.map((entry) {
             final index = entry.key;
             final item = entry.value;
@@ -1287,19 +1312,19 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }) {
     final percentage = total > 0 ? amount / total : 0.0;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            child: Icon(_parseIcon(category?.icon), color: color, size: 18),
+            child: Icon(_parseIcon(category?.icon), color: color, size: 20),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1307,20 +1332,22 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(category?.name ?? '未分类', style: const TextStyle(fontSize: 14)),
+                    Text(category?.name ?? '未分类', style: AppTypography.bodyLight()),
                     Text(
                       '+¥ ${_amountFormat.format(amount)}',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.green.shade600),
+                      style: AppTypography.bodyMediumLight(color: AppColors.success),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                LinearProgressIndicator(
-                  value: percentage,
-                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  color: color,
-                  borderRadius: BorderRadius.circular(4),
-                  minHeight: 5,
+                const SizedBox(height: AppSpacing.sm),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
+                  child: LinearProgressIndicator(
+                    value: percentage,
+                    backgroundColor: AppColors.border,
+                    color: color,
+                    minHeight: 5,
+                  ),
                 ),
               ],
             ),
@@ -1348,8 +1375,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('全年收支走势', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 16),
+          Text('全年收支走势', style: AppTypography.h3Light()),
+          const SizedBox(height: AppSpacing.lg),
           SizedBox(
             height: 160,
             child: BarChart(
@@ -1363,7 +1390,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                       getTitlesWidget: (value, meta) {
                         final month = value.toInt() + 1;
                         if (month < 1 || month > 12) return const SizedBox.shrink();
-                        return Text('$month月', style: const TextStyle(fontSize: 9));
+                        return Text('$month月', style: AppTypography.smallLight());
                       },
                     ),
                   ),
@@ -1379,18 +1406,36 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     x: index,
                     barsSpace: 1,
                     barRods: [
-                      BarChartRodData(toY: income, color: Colors.green.shade400, width: 4, borderRadius: BorderRadius.circular(2)),
-                      BarChartRodData(toY: expense, color: Colors.red.shade400, width: 4, borderRadius: BorderRadius.circular(2)),
+                      BarChartRodData(toY: income, color: AppColors.success, width: 4, borderRadius: BorderRadius.circular(AppRadius.xs)),
+                      BarChartRodData(toY: expense, color: AppColors.error, width: 4, borderRadius: BorderRadius.circular(AppRadius.xs)),
                     ],
                   );
                 }),
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => AppColors.primaryText,
+                    tooltipRoundedRadius: AppRadius.lg,
+                    tooltipPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final label = rodIndex == 0 ? '收入' : '支出';
+                      final color = rod.color ?? AppColors.secondaryText;
                       return BarTooltipItem(
-                        '$label: ¥${rod.toY.toStringAsFixed(0)}',
-                        const TextStyle(color: Colors.white, fontSize: 10),
+                        '',
+                        AppTypography.smallMediumLight(color: Colors.white),
+                        children: [
+                          TextSpan(
+                            text: '● ',
+                            style: TextStyle(
+                              color: color,
+                              fontSize: 8,
+                              height: 1.2,
+                            ),
+                          ),
+                          TextSpan(text: '$label  ¥${rod.toY.toStringAsFixed(0)}'),
+                        ],
                       );
                     },
                   ),
@@ -1398,13 +1443,13 @@ class TransactionsScreenState extends State<TransactionsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildLegendItem('收入', Colors.green.shade400),
-              const SizedBox(width: 16),
-              _buildLegendItem('支出', Colors.red.shade400),
+              _buildLegendItem('收入', AppColors.success),
+              const SizedBox(width: AppSpacing.lg),
+              _buildLegendItem('支出', AppColors.error),
             ],
           ),
         ],
@@ -1459,13 +1504,27 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildLegendItem(String label, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11)),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(label, style: AppTypography.smallMediumLight(color: color)),
+        ],
+      ),
     );
   }
 
@@ -1488,20 +1547,25 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Color _defaultCategoryColor(int index) {
-    final colors = [Colors.red, Colors.orange, Colors.amber, Colors.green, Colors.blue, Colors.indigo, Colors.purple, Colors.pink, Colors.teal, Colors.brown];
+    final colors = [
+      AppColors.error,
+      AppColors.warning,
+      const Color(0xFFFBBF24),
+      AppColors.success,
+      AppColors.brand,
+      const Color(0xFF3B82F6),
+      const Color(0xFF8B5CF6),
+      const Color(0xFFEC4899),
+      const Color(0xFF14B8A6),
+      const Color(0xFF8D6E63),
+    ];
     return colors[index % colors.length];
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.receipt_long, size: 64, color: Theme.of(context).colorScheme.outlineVariant),
-          const SizedBox(height: 16),
-          Text('暂无记录', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        ],
-      ),
+    return const AppEmptyState(
+      icon: Icons.receipt_long,
+      title: '暂无记录',
     );
   }
 
@@ -1510,17 +1574,18 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     final dailyExpense = items.where((t) => t.type == 'expense').fold(0.0, (sum, t) => sum + t.amount);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageHorizontal,
+        AppSpacing.lg,
+        AppSpacing.pageHorizontal,
+        AppSpacing.sm,
+      ),
       child: Row(
         children: [
           Expanded(
             child: Text(
               _formatDayHeader(date),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+              style: AppTypography.captionMediumLight(),
             ),
           ),
           if (dailyIncome > 0 || dailyExpense > 0)
@@ -1536,10 +1601,10 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     final children = <InlineSpan>[];
     if (income > 0) {
       children.addAll([
-        TextSpan(text: '收 ', style: TextStyle(fontSize: 11, color: Colors.green.shade600)),
+        TextSpan(text: '收 ', style: AppTypography.smallLight(color: AppColors.success)),
         TextSpan(
           text: '+${_summaryFormat.format(income)}',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.green.shade600),
+          style: AppTypography.smallMediumLight(color: AppColors.success),
         ),
       ]);
     }
@@ -1548,10 +1613,10 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     }
     if (expense > 0) {
       children.addAll([
-        TextSpan(text: '支 ', style: TextStyle(fontSize: 11, color: Colors.red.shade600)),
+        TextSpan(text: '支 ', style: AppTypography.smallLight(color: AppColors.error)),
         TextSpan(
           text: '-${_summaryFormat.format(expense)}',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red.shade600),
+          style: AppTypography.smallMediumLight(color: AppColors.error),
         ),
       ]);
     }
@@ -1576,15 +1641,18 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   Widget _buildTransactionTile(Transaction t) {
     final category = _getCategory(t.localCategoryId);
     final isExpense = t.type == 'expense';
-    final amountColor = isExpense ? Colors.red.shade600 : Colors.green.shade600;
-    final catColor = _parseColor(category?.color) ?? Colors.grey;
+    final amountColor = isExpense ? AppColors.error : AppColors.success;
+    final catColor = _parseColor(category?.color) ?? AppColors.secondaryText;
     final iconData = _parseIcon(category?.icon);
 
     return InkWell(
       onTap: () => openEditor(t),
       onLongPress: () => _deleteTransaction(t),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.pageHorizontal,
+          vertical: AppSpacing.md,
+        ),
         child: Row(
           children: [
             Container(
@@ -1592,32 +1660,32 @@ class TransactionsScreenState extends State<TransactionsScreen> {
               height: 44,
               decoration: BoxDecoration(
                 color: catColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Icon(iconData, color: catColor, size: 22),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     category?.name ?? (isExpense ? '支出' : '收入'),
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Theme.of(context).colorScheme.onSurface),
+                    style: AppTypography.bodyMediumLight(),
                   ),
                   if (t.note != null && t.note!.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       t.note!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      style: AppTypography.smallLight(),
                     ),
                   ],
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 120),
               child: Column(
@@ -1625,13 +1693,13 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 children: [
                   Text(
                     '${isExpense ? '-' : '+'}${_amountFormat.format(t.amount)}',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: amountColor),
+                    style: AppTypography.h3Light(color: amountColor),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.right,
                   ),
                   if (t.syncStatus != 'synced')
-                    Icon(Icons.cloud_off, size: 12, color: Theme.of(context).colorScheme.outline),
+                    const Icon(Icons.cloud_off, size: 12, color: AppColors.tertiaryText),
                 ],
               ),
             ),
@@ -1664,23 +1732,5 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       case 'investment': return Icons.trending_up;
       default: return Icons.label;
     }
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final ValueChanged<bool>? onSelected;
-
-  const _FilterChip({required this.label, required this.selected, this.onSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: onSelected,
-      visualDensity: VisualDensity.compact,
-    );
   }
 }

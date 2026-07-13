@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:leevinote/design/app_theme.dart';
 import 'package:leevinote/models/transaction.dart';
 import 'package:leevinote/models/transaction_category.dart';
 import 'package:leevinote/services/local_transaction_service.dart';
 import 'package:leevinote/services/local_transaction_category_service.dart';
 import 'package:leevinote/services/transaction_service.dart';
-import 'package:leevinote/screens/transaction_category_manager_screen.dart';
+import 'package:leevinote/widgets/widgets.dart';
+import 'transaction_category_manager_screen.dart';
 
 class TransactionEditorScreen extends StatefulWidget {
   final Transaction? transaction;
@@ -51,6 +53,14 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
       initialDate: _transactionDate,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+                primary: AppColors.brand,
+              ),
+        ),
+        child: child!,
+      ),
     );
     if (picked != null) {
       setState(() => _transactionDate = picked);
@@ -59,22 +69,12 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
 
   Future<void> _delete() async {
     final service = context.read<TransactionService>();
-    final confirmed = await showDialog<bool>(
+    final confirmed = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除记录'),
-        content: const Text('确定要删除这条记录吗？删除后无法恢复。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+      title: '删除记录',
+      content: '确定要删除这条记录吗？删除后无法恢复。',
+      confirmLabel: '删除',
+      destructive: true,
     );
     if (confirmed != true) return;
     await service.deleteTransaction(widget.transaction!.localId);
@@ -85,7 +85,9 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     final amountText = _amountC.text.trim();
     final amount = double.tryParse(amountText) ?? 0;
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入有效金额')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入有效金额')),
+      );
       return;
     }
 
@@ -135,104 +137,103 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         .where((c) => c.type == (_isExpense ? 'expense' : 'income'))
         .toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.transaction == null ? '记一笔' : '编辑记录'),
+    return AppScaffold.noPadding(
+      appBar: AppAppBar(
+        title: null,
         actions: [
+          AppButton.secondary(
+            label: '保存',
+            width: null,
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            onPressed: _save,
+          ),
+          const SizedBox(width: AppSpacing.sm),
           if (widget.transaction != null)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
+            AppIconButton(
+              icon: Icons.delete_outline,
               tooltip: '删除',
               onPressed: _delete,
             ),
-          TextButton(
-            onPressed: _save,
-            child: const Text('保存', style: TextStyle(fontSize: 16)),
-          ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.pageHorizontal,
+          vertical: AppSpacing.xl,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ChoiceChip(
-                    label: const Text('支出'),
-                    selected: _isExpense,
-                    selectedColor: Colors.red,
-                    labelStyle: TextStyle(color: _isExpense ? Colors.white : Colors.red, fontWeight: FontWeight.w600),
-                    onSelected: (_) => setState(() {
-                      _isExpense = true;
-                      _selectedLocalCategoryId = null;
-                    }),
-                  ),
-                  const SizedBox(width: 12),
-                  ChoiceChip(
-                    label: const Text('收入'),
-                    selected: !_isExpense,
-                    selectedColor: Colors.green,
-                    labelStyle: TextStyle(color: !_isExpense ? Colors.white : Colors.green, fontWeight: FontWeight.w600),
-                    onSelected: (_) => setState(() {
-                      _isExpense = false;
-                      _selectedLocalCategoryId = null;
-                    }),
-                  ),
-                ],
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceSecondary,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildTypeChip(label: '支出', isExpense: true),
+                    _buildTypeChip(label: '收入', isExpense: false),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 24),
-            TextField(
+            const SizedBox(height: AppSpacing.xxl),
+            AppInput(
               controller: _amountC,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
-              decoration: const InputDecoration(
-                hintText: '0.00',
-                border: InputBorder.none,
-                prefixIcon: Icon(Icons.attach_money, size: 32),
+              style: AppTypography.h1Light(),
+              hintText: '0.00',
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(left: AppSpacing.md),
+                child: Text('¥', style: AppTypography.h2Light(color: AppColors.secondaryText)),
               ),
             ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.calendar_today),
-              title: const Text('日期'),
-              trailing: Text(
-                DateFormat('yyyy年MM月dd日', 'zh_CN').format(_transactionDate),
-                style: const TextStyle(fontSize: 16),
-              ),
+            const SizedBox(height: AppSpacing.component),
+            AppCard(
+              shadows: const [],
               onTap: _pickDate,
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_today, color: AppColors.secondaryText),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(child: Text('日期', style: AppTypography.bodyLight())),
+                  Text(
+                    DateFormat('yyyy年MM月dd日', 'zh_CN').format(_transactionDate),
+                    style: AppTypography.bodyMediumLight(),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  const Icon(Icons.chevron_right, color: AppColors.tertiaryText),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            const Text('选择分类', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.xxl),
+            Text('选择分类', style: AppTypography.h3Light()),
+            const SizedBox(height: AppSpacing.lg),
             Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: AppSpacing.md,
+              runSpacing: AppSpacing.md,
               children: [
                 ...categories.map((c) => _buildCategoryChip(c)),
-                ActionChip(
-                  avatar: const Icon(Icons.add),
-                  label: const Text('管理分类'),
-                  onPressed: () => Navigator.push(
+                AppChip(
+                  label: '管理分类',
+                  icon: Icons.add,
+                  onSelected: (_) => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const TransactionCategoryManagerScreen()),
+                    AppPageRoute(builder: (_) => const TransactionCategoryManagerScreen()),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            TextField(
+            const SizedBox(height: AppSpacing.xxl),
+            AppInput(
               controller: _noteC,
-              decoration: const InputDecoration(
-                labelText: '备注',
-                hintText: '添加备注（可选）',
-                prefixIcon: Icon(Icons.notes),
-                border: OutlineInputBorder(),
-              ),
+              hintText: '添加备注（可选）',
+              prefixIcon: const Icon(Icons.notes_outlined, size: 20),
               maxLines: 3,
             ),
           ],
@@ -241,54 +242,77 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     );
   }
 
+  Widget _buildTypeChip({required String label, required bool isExpense}) {
+    final selected = _isExpense == isExpense;
+    final color = isExpense ? AppColors.error : AppColors.success;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      decoration: BoxDecoration(
+        color: selected ? color : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          onTap: () => setState(() {
+            _isExpense = isExpense;
+            _selectedLocalCategoryId = null;
+          }),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            child: Text(
+              label,
+              style: AppTypography.bodyMediumLight(
+                color: selected ? Colors.white : color,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCategoryChip(TransactionCategory category) {
     final selected = _selectedLocalCategoryId == category.localId;
     final color = _parseColor(category.color);
-    return ChoiceChip(
-      avatar: Icon(_parseIcon(category.icon), color: selected ? Colors.white : color, size: 18),
-      label: Text(category.name),
+
+    return AppChip(
+      label: category.name,
+      icon: _parseIcon(category.icon),
       selected: selected,
       selectedColor: color,
-      labelStyle: TextStyle(color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface),
       onSelected: (_) => setState(() => _selectedLocalCategoryId = category.localId),
     );
   }
 
   IconData _parseIcon(String? iconName) {
     switch (iconName) {
-      case 'food':
-        return Icons.restaurant;
-      case 'transport':
-        return Icons.directions_car;
-      case 'shopping':
-        return Icons.shopping_bag;
-      case 'entertainment':
-        return Icons.movie;
-      case 'housing':
-        return Icons.home;
-      case 'medical':
-        return Icons.local_hospital;
-      case 'education':
-        return Icons.school;
-      case 'salary':
-        return Icons.account_balance_wallet;
-      case 'bonus':
-        return Icons.card_giftcard;
-      case 'investment':
-        return Icons.trending_up;
-      default:
-        return Icons.label;
+      case 'food': return Icons.restaurant;
+      case 'transport': return Icons.directions_car;
+      case 'shopping': return Icons.shopping_bag;
+      case 'entertainment': return Icons.movie;
+      case 'housing': return Icons.home;
+      case 'medical': return Icons.local_hospital;
+      case 'education': return Icons.school;
+      case 'salary': return Icons.account_balance_wallet;
+      case 'bonus': return Icons.card_giftcard;
+      case 'investment': return Icons.trending_up;
+      default: return Icons.label;
     }
   }
 
   Color _parseColor(String? colorString) {
-    if (colorString == null || colorString.isEmpty) {
-      return Colors.grey;
-    }
+    if (colorString == null || colorString.isEmpty) return AppColors.secondaryText;
     try {
       return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
     } catch (_) {
-      return Colors.grey;
+      return AppColors.secondaryText;
     }
   }
 }

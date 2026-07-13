@@ -4,10 +4,12 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:leevinote/design/app_theme.dart';
 import 'package:leevinote/models/video.dart';
 import 'package:leevinote/services/video_service.dart';
 import 'package:leevinote/services/auth_service.dart';
-import 'package:leevinote/screens/login_screen.dart';
+import 'package:leevinote/widgets/widgets.dart';
+import 'login_screen.dart';
 
 class VideosScreen extends StatefulWidget {
   const VideosScreen({super.key});
@@ -26,21 +28,23 @@ class VideosScreenState extends State<VideosScreen> {
   }
 
   Future<void> sync() async {
+    final videoService = context.read<VideoService>();
     final auth = context.read<AuthService>();
     if (!auth.isAuthenticated) {
       final loggedIn = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        AppPageRoute(builder: (_) => const LoginScreen()),
       );
       if (loggedIn != true) return;
     }
-    final success = await context.read<VideoService>().sync();
+    if (!mounted) return;
+    final success = await videoService.sync();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(success ? '视频同步完成' : '同步失败'),
           behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+          margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
         ),
       );
     }
@@ -50,112 +54,112 @@ class VideosScreenState extends State<VideosScreen> {
   Widget build(BuildContext context) {
     final videoService = context.watch<VideoService>();
 
-    return Scaffold(
+    return AppScaffold.noPadding(
       body: videoService.loading
           ? const Center(child: CircularProgressIndicator())
           : videoService.videoList.isEmpty
               ? _buildEmptyState()
               : _buildVideoList(videoService),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: AppFAB(
         heroTag: 'videos_fab',
-        onPressed: () => _pickAndAddVideo(context),
-        child: const Icon(Icons.add),
+        onPressed: _pickAndAddVideo,
+        icon: Icons.add,
       ),
     );
   }
 
   Widget _buildEmptyState() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.video_library, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text('暂无视频', style: TextStyle(color: Colors.grey, fontSize: 16)),
-          SizedBox(height: 8),
-          Text('点击右下角按钮添加', style: TextStyle(color: Colors.grey, fontSize: 14)),
-        ],
-      ),
+    return const AppEmptyState(
+      icon: Icons.video_library,
+      title: '暂无视频',
+      subtitle: '点击右下角按钮添加',
     );
   }
 
   Widget _buildVideoList(VideoService service) {
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.pageHorizontal),
       itemCount: service.videoList.length,
       itemBuilder: (context, index) {
         final video = service.videoList[index];
-        return _buildVideoCard(video, service);
+        return AnimatedListItem(
+          index: index,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.listItemGap),
+            child: _buildVideoCard(video, service),
+          ),
+        );
       },
     );
   }
 
   Widget _buildVideoCard(Video video, VideoService service) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Container(
-          width: 80,
-          height: 56,
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(8),
+    return AppCard(
+      onTap: () => _playVideo(context, video),
+      child: Row(
+        children: [
+          Container(
+            width: 96,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.primaryText,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: const Center(
+              child: Icon(Icons.play_circle_fill, color: Colors.white, size: 28),
+            ),
           ),
-          child: const Center(
-            child: Icon(Icons.play_circle_fill, color: Colors.white, size: 28),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  video.title,
+                  style: AppTypography.bodyMediumLight(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '${video.description ?? '无描述'} · ${video.durationFormatted}',
+                  style: AppTypography.smallLight(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
-        ),
-        title: Text(
-          video.title,
-          style: const TextStyle(fontWeight: FontWeight.w500),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          '${video.description ?? '无描述'}  ·  ${video.durationFormatted}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline),
-          onPressed: () {
-            showDialog(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('删除视频'),
-                content: Text('确定删除"${video.title}"吗？'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('取消'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      service.deleteVideo(video.localId);
-                      Navigator.pop(ctx);
-                    },
-                    child: const Text('确定', style: TextStyle(color: Colors.red)),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-        onTap: () => _playVideo(context, video),
+          AppIconButton(
+            icon: Icons.delete_outline,
+            onPressed: () => _confirmDelete(video, service),
+          ),
+        ],
       ),
     );
+  }
+
+  void _confirmDelete(Video video, VideoService service) {
+    AppDialog.confirm(
+      context: context,
+      title: '删除视频',
+      content: '确定删除"${video.title}"吗？',
+      confirmLabel: '删除',
+      destructive: true,
+    ).then((confirmed) {
+      if (confirmed == true) service.deleteVideo(video.localId);
+    });
   }
 
   void _playVideo(BuildContext context, Video video) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => _VideoPlayerScreen(video: video),
-      ),
+      AppPageRoute(builder: (_) => _VideoPlayerScreen(video: video)),
     );
   }
 
-  Future<void> _pickAndAddVideo(BuildContext context) async {
+  Future<void> _pickAndAddVideo() async {
+    final videoService = context.read<VideoService>();
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -176,7 +180,8 @@ class VideosScreenState extends State<VideosScreen> {
         duration: file.size > 0 ? file.size : null,
       );
 
-      await context.read<VideoService>().createVideo(video);
+      if (!mounted) return;
+      await videoService.createVideo(video);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -236,9 +241,9 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 8),
-              Text('播放失败: $errorMessage', style: const TextStyle(color: Colors.white)),
+              const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+              const SizedBox(height: AppSpacing.md),
+              Text('播放失败: $errorMessage', style: AppTypography.bodyLight(color: Colors.white)),
             ],
           ),
         );
@@ -261,14 +266,17 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
+      appBar: AppAppBar(
         backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text(
+        titleWidget: Text(
           widget.video.title,
-          style: const TextStyle(color: Colors.white),
+          style: AppTypography.bodyLight(color: Colors.white),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        leading: AppIconButton(
+          icon: Icons.arrow_back,
+          color: Colors.white,
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Center(
         child: _initialized && _chewieController != null

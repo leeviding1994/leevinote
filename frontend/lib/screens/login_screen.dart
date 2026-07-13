@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:leevinote/design/app_theme.dart';
 import 'package:leevinote/services/auth_service.dart';
+import 'package:leevinote/widgets/widgets.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,19 +20,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+    final theme = Theme.of(context);
+
+    return AppScaffold.noPadding(
+      appBar: AppAppBar(
+        leading: AppIconButton(
+          icon: Icons.arrow_back,
           onPressed: () => Navigator.pop(context, false),
         ),
-        title: Text(_isLogin ? '登录' : '注册'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        title: _isLogin ? '登录' : '注册',
+        backgroundColor: theme.scaffoldBackgroundColor,
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -39,71 +42,52 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: 80,
                 height: 80,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: AppSpacing.xl),
               Text(
                 'LeeviNote',
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: AppTypography.h1Light(color: theme.colorScheme.onSurface),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 '你的多功能笔记平台',
-                style: Theme.of(context).textTheme.bodyLarge,
+                style: AppTypography.captionLight(),
               ),
-              const SizedBox(height: 48),
-              TextField(
+              const SizedBox(height: AppSpacing.xxl),
+              AppInput(
                 controller: _usernameController,
-                decoration: const InputDecoration(
-                  labelText: '用户名',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
-                ),
+                hintText: '用户名',
+                prefixIcon: const Icon(Icons.person_outline, size: 20),
+                textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.component),
               if (!_isLogin) ...[
-                TextField(
+                AppInput(
                   controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: '邮箱',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
-                  ),
+                  hintText: '邮箱',
+                  prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.component),
               ],
-              TextField(
+              AppInput(
                 controller: _passwordController,
+                hintText: '密码',
+                prefixIcon: const Icon(Icons.lock_outline, size: 20),
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: '密码',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock),
-                ),
+                textInputAction: TextInputAction.done,
+                onEditingComplete: _handleSubmit,
               ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleSubmit,
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(_isLogin ? '登录' : '注册'),
-                ),
+              const SizedBox(height: AppSpacing.xl),
+              AppButton(
+                label: _isLogin ? '登录' : '注册',
+                isLoading: _isLoading,
+                onPressed: _handleSubmit,
               ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _isLogin = !_isLogin;
-                  });
-                },
-                child: Text(_isLogin ? '没有账号？注册' : '已有账号？登录'),
+              const SizedBox(height: AppSpacing.component),
+              AppButton.secondary(
+                label: _isLogin ? '没有账号？注册' : '已有账号？登录',
+                onPressed: () => setState(() => _isLogin = !_isLogin),
               ),
             ],
           ),

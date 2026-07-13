@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import 'package:lunar/lunar.dart';
+import 'package:leevinote/design/app_theme.dart';
 import 'package:leevinote/models/schedule.dart';
 import 'package:leevinote/services/schedule_service.dart';
 import 'package:leevinote/services/holiday_service.dart';
 import 'package:leevinote/services/auth_service.dart';
+import 'package:leevinote/widgets/widgets.dart';
 import 'package:leevinote/screens/login_screen.dart';
 
 enum ScheduleViewMode { day, week, month, year }
@@ -29,18 +31,18 @@ const Map<int, String> _weekdayNames = {
 };
 
 const _scheduleColors = [
-  Color(0xFF5B8FF9),  // 蓝色
-  Color(0xFF5AD8A6),  // 绿色
-  Color(0xFFF6BD16),  // 黄色
-  Color(0xFF6DC8EC),  // 青色
-  Color(0xFF9270CA),  // 紫色
-  Color(0xFFFF9D4D),  // 橙色
-  Color(0xFF269A99),  // 深青
-  Color(0xFFFF99C3),  // 粉色
-  Color(0xFFB5C334),  // 黄绿
-  Color(0xFF6D64A8),  // 深紫
-  Color(0xFFE8684A),  // 红色
-  Color(0xFF7CB305),  // 草绿
+  Color(0xFF6366F1), // 蓝紫
+  Color(0xFF8B5CF6), // 紫
+  Color(0xFF3B82F6), // 蓝
+  Color(0xFF10B981), // 绿
+  Color(0xFFF59E0B), // 琥珀
+  Color(0xFFEC4899), // 粉
+  Color(0xFF06B6D4), // 青
+  Color(0xFFEF4444), // 红
+  Color(0xFF14B8A6), //  teal
+  Color(0xFFF97316), // 橙
+  Color(0xFF84CC16), // 黄绿
+  Color(0xFF64748B), // 灰蓝
 ];
 
   Color _getScheduleColor(int index) {
@@ -49,18 +51,14 @@ const _scheduleColors = [
 
   Widget _todayBadge(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primary,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppRadius.xs),
       ),
-      child: const Text(
+      child: Text(
         '今',
-        style: TextStyle(
-          fontSize: 9,
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
+        style: AppTypography.smallMediumLight(color: Colors.white),
       ),
     );
   }
@@ -72,7 +70,7 @@ String _getLunarDayShort(DateTime date) {
     final day = lunar.getDayInChinese();
     // 如果是初一，显示月份
     if (day == '初一') {
-      return lunar.getMonthInChinese() + '月';
+      return '${lunar.getMonthInChinese()}月';
     }
     return day;
   } catch (_) {
@@ -119,6 +117,7 @@ class SchedulesScreenState extends State<SchedulesScreen> {
   }
 
   Future<void> sync() async {
+    final scheduleService = context.read<ScheduleService>();
     final auth = context.read<AuthService>();
     if (!auth.isAuthenticated) {
       final loggedIn = await Navigator.push<bool>(
@@ -127,13 +126,14 @@ class SchedulesScreenState extends State<SchedulesScreen> {
       );
       if (loggedIn != true) return;
     }
-    final success = await context.read<ScheduleService>().sync();
+    if (!mounted) return;
+    final success = await scheduleService.sync();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(success ? '日程同步完成' : '同步失败'),
           behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+          margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
         ),
       );
     }
@@ -227,7 +227,10 @@ class SchedulesScreenState extends State<SchedulesScreen> {
 
   Widget _buildViewModeSelector() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.pageHorizontal,
+        vertical: AppSpacing.md,
+      ),
       child: SizedBox(
         width: double.infinity,
         child: SegmentedButton<ScheduleViewMode>(
@@ -348,7 +351,10 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     final isToday = isSameDay(_selectedDay, DateTime.now());
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.lg,
+        horizontal: AppSpacing.pageHorizontal,
+      ),
       child: Row(
         children: [
           Column(
@@ -358,61 +364,57 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                 children: [
                   Text(
                     '${_selectedDay.month}月${_selectedDay.day}日',
-                    style: const TextStyle(
-                        fontSize: 24, fontWeight: FontWeight.bold),
+                    style: AppTypography.h2Light(),
                   ),
                   if (isToday) ...[
-                    const SizedBox(width: 6),
+                    const SizedBox(width: AppSpacing.sm),
                     _todayBadge(context),
                   ],
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.md),
                   Text(
                     '周${_weekdayNames[_selectedDay.weekday] ?? ''}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: isWeekend || isHoli ? Colors.red.shade400 : Colors.grey,
+                    style: AppTypography.bodyLight(
+                      color: isWeekend || isHoli ? AppColors.error : AppColors.secondaryText,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.md),
                   Text(
                     lunarFull,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: AppTypography.captionLight(),
                   ),
                 ],
               ),
               if (isHoli && holiday != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(4),
+                      color: AppColors.error.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                     child: Text(
                       holiday.name,
-                      style: TextStyle(
-                          color: Colors.red.shade700, fontSize: 13),
+                      style: AppTypography.smallMediumLight(color: AppColors.error),
                     ),
                   ),
                 ),
             ],
           ),
           const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
+          AppIconButton(
+            icon: Icons.chevron_left,
             onPressed: () {
               setState(() {
                 _selectedDay = _selectedDay.subtract(const Duration(days: 1));
               });
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
+          AppIconButton(
+            icon: Icons.chevron_right,
             onPressed: () {
               setState(() {
                 _selectedDay = _selectedDay.add(const Duration(days: 1));
@@ -426,22 +428,19 @@ class SchedulesScreenState extends State<SchedulesScreen> {
 
   Widget _buildDayTimeline(List<Schedule> events) {
     if (events.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.event_busy, size: 48, color: Colors.grey),
-            SizedBox(height: 8),
-            Text('暂无日程', style: TextStyle(color: Colors.grey, fontSize: 16)),
-          ],
-        ),
+      return const AppEmptyState(
+        icon: Icons.event_busy,
+        title: '暂无日程',
       );
     }
 
     events.sort((a, b) => a.startTime.compareTo(b.startTime));
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.pageHorizontal,
+        vertical: AppSpacing.md,
+      ),
       itemCount: events.length,
       itemBuilder: (context, index) {
         final event = events[index];
@@ -451,75 +450,72 @@ class SchedulesScreenState extends State<SchedulesScreen> {
         final endStr = DateFormat('HH:mm').format(event.endTime);
         final isAllDay = event.startTime.hour == 0 && event.endTime.hour == 23;
 
-        return GestureDetector(
-          onTap: () => _showEditScheduleDialog(context, event),
-          child: Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 4,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(2),
+        return AnimatedListItem(
+          index: index,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.listItemGap),
+            child: GestureDetector(
+              onTap: () => _showEditScheduleDialog(context, event),
+              child: AppCard(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(AppRadius.xs),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Checkbox(
-                    value: event.completed,
-                    onChanged: (v) {
-                      context.read<ScheduleService>().toggleCompleted(event.localId);
-                    },
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          event.title,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                            decoration: event.completed ? TextDecoration.lineThrough : null,
-                            color: event.completed ? Colors.grey : null,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          isAllDay ? '全天' : '$startStr - $endStr',
-                          style: TextStyle(
-                            color: event.completed ? Colors.grey.shade400 : Colors.grey.shade600,
-                            decoration: event.completed ? TextDecoration.lineThrough : null,
-                          ),
-                        ),
-                        if (event.location != null &&
-                            event.location!.isNotEmpty)
+                    const SizedBox(width: AppSpacing.md),
+                    Checkbox(
+                      value: event.completed,
+                      onChanged: (v) {
+                        context.read<ScheduleService>().toggleCompleted(event.localId);
+                      },
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           Text(
-                            event.location!,
-                            style: TextStyle(
-                              color: event.completed ? Colors.grey.shade400 : Colors.grey.shade500,
+                            event.title,
+                            style: AppTypography.bodyMediumLight(
+                              color: event.completed ? AppColors.tertiaryText : null,
                               decoration: event.completed ? TextDecoration.lineThrough : null,
                             ),
                           ),
-                      ],
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            isAllDay ? '全天' : '$startStr - $endStr',
+                            style: AppTypography.captionLight(
+                              color: event.completed ? AppColors.tertiaryText : null,
+                              decoration: event.completed ? TextDecoration.lineThrough : null,
+                            ),
+                          ),
+                          if (event.location != null && event.location!.isNotEmpty)
+                            Text(
+                              event.location!,
+                              style: AppTypography.smallLight(
+                                color: event.completed ? AppColors.tertiaryText : null,
+                                decoration: event.completed ? TextDecoration.lineThrough : null,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () => _deleteSchedule(event),
-                  ),
-                ],
+                    AppIconButton(
+                      icon: Icons.delete_outline,
+                      iconSize: 20,
+                      onPressed: () => _deleteSchedule(event),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -745,34 +741,35 @@ class SchedulesScreenState extends State<SchedulesScreen> {
 
   Widget _buildSearchPanel() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageHorizontal,
+        0,
+        AppSpacing.pageHorizontal,
+        AppSpacing.md,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
+          AppInput(
             controller: _searchController,
-            decoration: InputDecoration(
-              hintText: '搜索日程名称...',
-              prefixIcon: const Icon(Icons.search, size: 20),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.clear, size: 18),
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                onPressed: () {
-                  _searchController.clear();
-                  _performSearch();
-                },
-              ),
-              border: const OutlineInputBorder(),
-              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            hintText: '搜索日程名称...',
+            prefixIcon: const Icon(Icons.search, size: 20),
+            suffixIcon: AppIconButton(
+              icon: Icons.clear,
+              iconSize: 18,
+              onPressed: () {
+                _searchController.clear();
+                _performSearch();
+              },
             ),
             onSubmitted: (_) => _performSearch(),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
               Expanded(
-                child: InkWell(
+                child: AppCard(
+                  shadows: const [],
                   onTap: () async {
                     final date = await showDatePicker(
                       context: context,
@@ -785,23 +782,32 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                       _performSearch();
                     }
                   },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: '开始日期',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    ),
-                    child: Text(
-                      _searchStartDate != null
-                          ? DateFormat('yyyy-MM-dd').format(_searchStartDate!)
-                          : '不限',
-                    ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 18),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('开始日期', style: AppTypography.smallLight()),
+                            Text(
+                              _searchStartDate != null
+                                  ? DateFormat('yyyy-MM-dd').format(_searchStartDate!)
+                                  : '不限',
+                              style: AppTypography.bodyMediumLight(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
-                child: InkWell(
+                child: AppCard(
+                  shadows: const [],
                   onTap: () async {
                     final date = await showDatePicker(
                       context: context,
@@ -814,29 +820,34 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                       _performSearch();
                     }
                   },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: '结束日期',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    ),
-                    child: Text(
-                      _searchEndDate != null
-                          ? DateFormat('yyyy-MM-dd').format(_searchEndDate!)
-                          : '不限',
-                    ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 18),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('结束日期', style: AppTypography.smallLight()),
+                            Text(
+                              _searchEndDate != null
+                                  ? DateFormat('yyyy-MM-dd').format(_searchEndDate!)
+                                  : '不限',
+                              style: AppTypography.bodyMediumLight(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _performSearch,
-              child: const Text('搜索'),
-            ),
+          const SizedBox(height: AppSpacing.md),
+          AppButton(
+            label: '搜索',
+            onPressed: _performSearch,
           ),
         ],
       ),
@@ -845,20 +856,14 @@ class SchedulesScreenState extends State<SchedulesScreen> {
 
   Widget _buildSearchResults() {
     if (_searchResults.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off, size: 48, color: Colors.grey),
-            SizedBox(height: 8),
-            Text('未找到日程', style: TextStyle(color: Colors.grey, fontSize: 16)),
-          ],
-        ),
+      return const AppEmptyState(
+        icon: Icons.search_off,
+        title: '未找到日程',
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.pageHorizontal),
       itemCount: _searchResults.length,
       itemBuilder: (context, index) {
         final event = _searchResults[index];
@@ -866,27 +871,49 @@ class SchedulesScreenState extends State<SchedulesScreen> {
         final endStr = DateFormat('MM-dd HH:mm').format(event.endTime);
         final isAllDay = event.startTime.hour == 0 && event.endTime.hour == 23;
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              child: Icon(
-                isAllDay ? Icons.event : Icons.access_time,
-                color: Theme.of(context).colorScheme.primary,
-                size: 20,
+        return AnimatedListItem(
+          index: index,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.listItemGap),
+            child: AppCard(
+              onTap: () => _showEditScheduleDialog(context, event),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Icon(
+                      isAllDay ? Icons.event : Icons.access_time,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(event.title, style: AppTypography.bodyMediumLight()),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          isAllDay
+                              ? '${DateFormat('yyyy-MM-dd').format(event.startTime)} 全天'
+                              : '$startStr - $endStr',
+                          style: AppTypography.smallLight(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  AppIconButton(
+                    icon: Icons.delete_outline,
+                    onPressed: () => _deleteSchedule(event),
+                  ),
+                ],
               ),
-            ),
-            title: Text(event.title, style: const TextStyle(fontWeight: FontWeight.w500)),
-            subtitle: Text(
-              isAllDay
-                  ? '${DateFormat('yyyy-MM-dd').format(event.startTime)} 全天'
-                  : '$startStr - $endStr',
-            ),
-            onTap: () => _showEditScheduleDialog(context, event),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.red),
-              onPressed: () => _deleteSchedule(event),
             ),
           ),
         );
@@ -914,7 +941,7 @@ class SchedulesScreenState extends State<SchedulesScreen> {
             final events = service.getSchedulesForDate(day);
             return Dialog(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
@@ -928,11 +955,16 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.xl,
+                            AppSpacing.lg,
+                            AppSpacing.lg,
+                            AppSpacing.lg,
+                          ),
                           decoration: BoxDecoration(
                             color: Theme.of(context).colorScheme.primaryContainer,
                             borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(16),
+                              top: Radius.circular(AppRadius.lg),
                             ),
                           ),
                           child: Row(
@@ -945,52 +977,42 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                       children: [
                                         Text(
                                           '${day.month}月${day.day}日',
-                                          style: const TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                          style: AppTypography.h2Light(),
                                         ),
                                         if (isToday) ...[
-                                          const SizedBox(width: 6),
+                                          const SizedBox(width: AppSpacing.sm),
                                           _todayBadge(context),
                                         ],
                                       ],
                                     ),
-                                    const SizedBox(height: 2),
+                                    const SizedBox(height: AppSpacing.xs),
                                     Row(
                                       children: [
                                         Text(
                                           '周${_weekdayNames[day.weekday] ?? ''}',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: isWeekend || isHoli
-                                                ? Colors.red.shade400
-                                                : Colors.grey.shade600,
+                                          style: AppTypography.captionLight(
+                                            color: isWeekend || isHoli ? AppColors.error : AppColors.secondaryText,
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
+                                        const SizedBox(width: AppSpacing.md),
                                         Text(
                                           lunarFull,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
+                                          style: AppTypography.smallLight(),
                                         ),
                                         if (isHoli && holiday != null) ...[
-                                          const SizedBox(width: 8),
+                                          const SizedBox(width: AppSpacing.md),
                                           Container(
                                             padding: const EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 2),
+                                              horizontal: AppSpacing.md,
+                                              vertical: AppSpacing.xs,
+                                            ),
                                             decoration: BoxDecoration(
-                                              color: Colors.red.shade50,
-                                              borderRadius: BorderRadius.circular(4),
+                                              color: AppColors.error.withValues(alpha: 0.08),
+                                              borderRadius: BorderRadius.circular(AppRadius.xs),
                                             ),
                                             child: Text(
                                               holiday.name,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.red.shade700,
-                                              ),
+                                              style: AppTypography.smallMediumLight(color: AppColors.error),
                                             ),
                                           ),
                                         ],
@@ -999,8 +1021,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                   ],
                                 ),
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.close),
+                              AppIconButton(
+                                icon: Icons.close,
                                 onPressed: () => Navigator.pop(ctx),
                               ),
                             ],
@@ -1008,19 +1030,24 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                         ),
                         const Divider(height: 1),
                         if (events.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.all(32),
+                          Padding(
+                            padding: const EdgeInsets.all(AppSpacing.xxl),
                             child: Center(
                               child: Text(
                                 '暂无日程',
-                                style: TextStyle(color: Colors.grey, fontSize: 16),
+                                style: AppTypography.bodyLight(color: AppColors.tertiaryText),
                               ),
                             ),
                           )
                         else
                           Flexible(
                             child: ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 72),
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.md,
+                                AppSpacing.md,
+                                AppSpacing.md,
+                                72,
+                              ),
                               shrinkWrap: true,
                               itemCount: events.length,
                               itemBuilder: (context, index) {
@@ -1029,47 +1056,62 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                 final endStr = DateFormat('HH:mm').format(event.endTime);
                                 final isAllDay = event.startTime.hour == 0 && event.endTime.hour == 23;
 
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: ListTile(
-                                    leading: Checkbox(
-                                      value: event.completed,
-                                      onChanged: (v) {
-                                        context.read<ScheduleService>().toggleCompleted(event.localId);
-                                        setDialogState(() {});
-                                      },
-                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                    title: Text(
-                                      event.title,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        decoration: event.completed ? TextDecoration.lineThrough : null,
-                                        color: event.completed ? Colors.grey : null,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      isAllDay
-                                          ? '全天'
-                                          : event.location != null && event.location!.isNotEmpty
-                                              ? '$startStr - $endStr  ·  ${event.location}'
-                                              : '$startStr - $endStr',
-                                      style: TextStyle(
-                                        color: event.completed ? Colors.grey.shade400 : null,
-                                        decoration: event.completed ? TextDecoration.lineThrough : null,
-                                      ),
-                                    ),
-                                    onTap: () {
-                                      Navigator.pop(ctx);
-                                      _showEditScheduleDialog(context, event);
-                                    },
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                      onPressed: () {
-                                        _deleteSchedule(event);
-                                        Navigator.pop(ctx);
-                                      },
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: AppSpacing.listItemGap),
+                                  child: AppCard(
+                                    child: Row(
+                                      children: [
+                                        Checkbox(
+                                          value: event.completed,
+                                          onChanged: (v) {
+                                            context.read<ScheduleService>().toggleCompleted(event.localId);
+                                            setDialogState(() {});
+                                          },
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                        const SizedBox(width: AppSpacing.xs),
+                                        Expanded(
+                                          child: InkWell(
+                                            onTap: () {
+                                              Navigator.pop(ctx);
+                                              _showEditScheduleDialog(context, event);
+                                            },
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  event.title,
+                                                  style: AppTypography.bodyMediumLight(
+                                                    color: event.completed ? AppColors.tertiaryText : null,
+                                                    decoration: event.completed ? TextDecoration.lineThrough : null,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: AppSpacing.xs),
+                                                Text(
+                                                  isAllDay
+                                                      ? '全天'
+                                                      : event.location != null && event.location!.isNotEmpty
+                                                          ? '$startStr - $endStr · ${event.location}'
+                                                          : '$startStr - $endStr',
+                                                  style: AppTypography.smallLight(
+                                                    color: event.completed ? AppColors.tertiaryText : null,
+                                                    decoration: event.completed ? TextDecoration.lineThrough : null,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        AppIconButton(
+                                          icon: Icons.delete_outline,
+                                          onPressed: () {
+                                            _deleteSchedule(event);
+                                            Navigator.pop(ctx);
+                                          },
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 );
@@ -1079,17 +1121,16 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                       ],
                     ),
                     Positioned(
-                      right: 16,
-                      bottom: 16,
-                      child: FloatingActionButton(
+                      right: AppSpacing.lg,
+                      bottom: AppSpacing.lg,
+                      child: AppFAB(
                         heroTag: 'day_events_fab_${day.toIso8601String()}',
-                        mini: true,
                         onPressed: () {
                           Navigator.pop(ctx);
                           setState(() => _selectedDay = day);
                           _showAddScheduleDialog(context);
                         },
-                        child: const Icon(Icons.add),
+                        icon: Icons.add,
                       ),
                     ),
                   ],
@@ -1104,7 +1145,6 @@ class SchedulesScreenState extends State<SchedulesScreen> {
 
   Widget _buildWeekView(ScheduleService service) {
     final holidayService = context.watch<HolidayService>();
-    // weekStart: Monday (DateTime.monday = 1, so weekday - 1 days back)
     final weekStart = _selectedDay.subtract(
       Duration(days: (_selectedDay.weekday - DateTime.monday) % 7),
     );
@@ -1113,12 +1153,12 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left),
+              AppIconButton(
+                icon: Icons.chevron_left,
                 onPressed: () {
                   setState(() {
                     _selectedDay = _selectedDay.subtract(const Duration(days: 7));
@@ -1127,10 +1167,10 @@ class SchedulesScreenState extends State<SchedulesScreen> {
               ),
               Text(
                 '${DateFormat('M月d日').format(days.first)} - ${DateFormat('M月d日').format(days.last)}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                style: AppTypography.bodyMediumLight(),
               ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right),
+              AppIconButton(
+                icon: Icons.chevron_right,
                 onPressed: () {
                   setState(() {
                     _selectedDay = _selectedDay.add(const Duration(days: 7));
@@ -1203,10 +1243,13 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     return InkWell(
       onTap: () => _showDayEventsBubble(context, day, service),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: const BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: Colors.grey.shade200),
+            bottom: BorderSide(color: AppColors.border),
           ),
         ),
         child: Row(
@@ -1234,56 +1277,50 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                             : events.isNotEmpty
                                 ? BoxDecoration(
                                     color: events.every((s) => s.completed)
-                                        ? Colors.green.withValues(alpha: 0.15)
-                                        : Colors.red.withValues(alpha: 0.15),
+                                        ? AppColors.success.withValues(alpha: 0.12)
+                                        : AppColors.error.withValues(alpha: 0.12),
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: events.every((s) => s.completed)
-                                          ? Colors.green
-                                          : Colors.red,
+                                          ? AppColors.success
+                                          : AppColors.error,
                                       width: 1.5,
                                     ),
                                   )
                                 : null,
                         child: Text(
                           '${day.day}',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
+                          style: AppTypography.h2Light(
                             color: isToday
                                 ? Colors.white
                                 : events.isNotEmpty
                                     ? (events.every((s) => s.completed)
-                                        ? Colors.green
-                                        : Colors.red)
+                                        ? AppColors.success
+                                        : AppColors.error)
                                     : isWeekend || isHoli
-                                        ? Colors.red.shade400
+                                        ? AppColors.error
                                         : null,
                           ),
                         ),
                       ),
                       if (isToday) ...[
-                        const SizedBox(width: 4),
+                        const SizedBox(width: AppSpacing.xs),
                         _todayBadge(context),
                       ],
                     ],
                   ),
                   Text(
                     '周${_weekdayNames[day.weekday] ?? ''}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isWeekend || isHoli
-                          ? Colors.red.shade400
-                          : Colors.grey.shade600,
+                    style: AppTypography.smallLight(
+                      color: isWeekend || isHoli ? AppColors.error : AppColors.secondaryText,
                     ),
                   ),
                   Text(
                     holiday?.name ?? _getLunarDayShort(day),
-                    style: TextStyle(
-                      fontSize: 10,
+                    style: AppTypography.smallLight(
                       color: isWeekend || isHoli
-                          ? Colors.red.shade300
-                          : Colors.grey.shade500,
+                          ? AppColors.error.withValues(alpha: 0.7)
+                          : AppColors.tertiaryText,
                     ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
@@ -1306,10 +1343,7 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                           Expanded(
                             child: Text(
                               h == 24 ? '24' : '$h',
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: Colors.grey.shade400,
-                              ),
+                              style: AppTypography.smallLight(),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -1325,17 +1359,14 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                         return Container(
                           height: 38,
                           alignment: Alignment.center,
-                          child: const Text(
-                            '无日程',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
+                            child: Text(
+                              '无日程',
+                              style: AppTypography.smallLight(),
                             ),
-                          ),
                         );
                       }
 
-                      return Container(
+                      return SizedBox(
                         height: contentHeight,
                         child: Stack(
                           children: [
@@ -1467,25 +1498,24 @@ class SchedulesScreenState extends State<SchedulesScreen> {
   }) {
     final events = service.getSchedulesForDate(date);
     final allCompleted = events.isNotEmpty && events.every((s) => s.completed);
-    final somePending = events.isNotEmpty && events.any((s) => !s.completed);
     final textColor = isDisabled
-        ? Colors.grey.shade400
+        ? AppColors.tertiaryText
         : isSelected
             ? Colors.white
             : isOutside
-                ? Colors.grey.shade400
+                ? AppColors.tertiaryText
                 : isWeekend || isHoliday
-                    ? Colors.red.shade400
+                    ? AppColors.error
                     : null;
     final subTextColor = isDisabled
-        ? Colors.grey.shade400
+        ? AppColors.tertiaryText
         : isOutside
-            ? Colors.grey.shade400
+            ? AppColors.tertiaryText
             : isHoliday
-                ? Colors.red.shade400
+                ? AppColors.error
                 : isWeekend
-                    ? Colors.red.shade400
-                    : Colors.grey.shade600;
+                    ? AppColors.error
+                    : AppColors.secondaryText;
     final lunarDay = _getLunarDayShort(date);
     final holiday = holidayService.isHolidayNameDay(date)
         ? holidayService.getHoliday(date)
@@ -1527,22 +1557,20 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                 : events.isNotEmpty
                                     ? BoxDecoration(
                                         color: allCompleted
-                                            ? Colors.green.withValues(alpha: 0.15)
-                                            : Colors.red.withValues(alpha: 0.15),
+                                            ? AppColors.success.withValues(alpha: 0.12)
+                                            : AppColors.error.withValues(alpha: 0.12),
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: allCompleted ? Colors.green : Colors.red,
+                                          color: allCompleted ? AppColors.success : AppColors.error,
                                           width: 1,
                                         ),
                                       )
                                     : null,
                         child: Text(
                           '${date.day}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                          style: AppTypography.bodyMediumLight(
                             color: isToday && events.isNotEmpty
-                                ? (allCompleted ? Colors.green : Colors.red)
+                                ? (allCompleted ? AppColors.success : AppColors.error)
                                 : textColor,
                           ),
                         ),
@@ -1557,10 +1585,7 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                 if (subText.isNotEmpty)
                   Text(
                     subText,
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: subTextColor,
-                    ),
+                    style: AppTypography.smallLight(color: subTextColor),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
@@ -1606,13 +1631,11 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                           Expanded(
                             child: Text(
                               '$timeStr ${e.title}',
-                              style: TextStyle(
-                                fontSize: 8,
+                              style: AppTypography.smallLight(color: color).copyWith(
                                 height: 1.1,
-                                color: color,
-                                overflow: TextOverflow.ellipsis,
                                 decoration: e.completed ? TextDecoration.lineThrough : null,
                               ),
+                              overflow: TextOverflow.ellipsis,
                               maxLines: 1,
                             ),
                           ),
@@ -1691,37 +1714,43 @@ class SchedulesScreenState extends State<SchedulesScreen> {
   }
 
   void _deleteSchedule(Schedule schedule) {
-    showDialog(
+    AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除日程'),
-        content: Text('确定删除"${schedule.title}"吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              context.read<ScheduleService>().deleteSchedule(schedule.localId);
-              Navigator.pop(ctx);
-            },
-            child: const Text('确定', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
+      title: '删除日程',
+      content: '确定删除"${schedule.title}"吗？',
+      confirmLabel: '删除',
+      destructive: true,
+    ).then((confirmed) {
+      if (confirmed == true && mounted) {
+        context.read<ScheduleService>().deleteSchedule(schedule.localId);
+      }
+    });
   }
 
   void _showAddScheduleDialog(BuildContext context) {
-    final titleC = TextEditingController();
-    final descC = TextEditingController();
-    final locationC = TextEditingController();
-    DateTime startDate = _selectedDay;
-    DateTime endDate = _selectedDay;
-    TimeOfDay startTime = const TimeOfDay(hour: 9, minute: 0);
-    TimeOfDay endTime = const TimeOfDay(hour: 10, minute: 0);
-    bool isAllDay = false;
+    _showScheduleEditor(context, null);
+  }
+
+  void _showEditScheduleDialog(BuildContext context, Schedule schedule) {
+    _showScheduleEditor(context, schedule);
+  }
+
+  void _showScheduleEditor(BuildContext context, Schedule? schedule) {
+    final isEditing = schedule != null;
+    final titleC = TextEditingController(text: schedule?.title ?? '');
+    final descC = TextEditingController(text: schedule?.description ?? '');
+    final locationC = TextEditingController(text: schedule?.location ?? '');
+    DateTime startDate = isEditing ? schedule.startTime : _selectedDay;
+    DateTime endDate = isEditing ? schedule.endTime : _selectedDay;
+    TimeOfDay startTime = isEditing
+        ? TimeOfDay.fromDateTime(schedule.startTime)
+        : const TimeOfDay(hour: 9, minute: 0);
+    TimeOfDay endTime = isEditing
+        ? TimeOfDay.fromDateTime(schedule.endTime)
+        : const TimeOfDay(hour: 10, minute: 0);
+    bool isAllDay = isEditing
+        ? (schedule.startTime.hour == 0 && schedule.endTime.hour == 23)
+        : false;
 
     showDialog(
       context: context,
@@ -1732,79 +1761,71 @@ class SchedulesScreenState extends State<SchedulesScreen> {
             return Align(
               alignment: Alignment.topCenter,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                child: Material(
-                  borderRadius: BorderRadius.circular(16),
-                  elevation: 8,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.pageHorizontal,
+                  vertical: AppSpacing.xl,
+                ),
+                child: AppCard(
+                  child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          '添加日程',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        Text(
+                          isEditing ? '编辑日程' : '添加日程',
+                          style: AppTypography.h2Light(),
                         ),
-                        const SizedBox(height: 20),
-                        TextField(
+                        const SizedBox(height: AppSpacing.xl),
+                        AppInput(
                           controller: titleC,
-                          decoration: const InputDecoration(
-                            labelText: '日程标题',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.event),
-                          ),
+                          hintText: '日程标题',
+                          prefixIcon: const Icon(Icons.event, size: 20),
                         ),
-                        const SizedBox(height: 12),
-                        TextField(
+                        const SizedBox(height: AppSpacing.component),
+                        AppInput(
                           controller: descC,
-                          decoration: const InputDecoration(
-                            labelText: '备注（可选）',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.description),
-                          ),
+                          hintText: '备注（可选）',
+                          prefixIcon: const Icon(Icons.description, size: 20),
                           maxLines: 2,
                         ),
-                        const SizedBox(height: 12),
-                        SwitchListTile(
-                          title: const Text('全天'),
-                          value: isAllDay,
-                          onChanged: (v) =>
-                              setSheetState(() => isAllDay = v),
-                          contentPadding: EdgeInsets.zero,
+                        const SizedBox(height: AppSpacing.component),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: isAllDay,
+                              onChanged: (v) => setSheetState(() => isAllDay = v ?? false),
+                            ),
+                            Text('全天', style: AppTypography.bodyLight()),
+                          ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.sm),
                         Row(
                           children: [
                             Expanded(
-                              child: InkWell(
+                              child: _buildDatePickerCard(
+                                label: '开始日期',
+                                value: DateFormat('M月d日').format(startDate),
+                                icon: Icons.calendar_today,
                                 onTap: () async {
                                   final date = await showDatePicker(
                                     context: ctx,
                                     initialDate: startDate,
-                                    firstDate: DateTime.now()
-                                        .subtract(const Duration(days: 30)),
-                                    lastDate: DateTime.now()
-                                        .add(const Duration(days: 365)),
+                                    firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                                    lastDate: DateTime.now().add(const Duration(days: 365)),
                                   );
                                   if (date != null) {
                                     setSheetState(() => startDate = date);
                                   }
                                 },
-                                child: InputDecorator(
-                                  decoration: const InputDecoration(
-                                    labelText: '开始日期',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.calendar_today),
-                                  ),
-                                  child: Text(DateFormat('M月d日').format(startDate)),
-                                ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.md),
                             if (!isAllDay)
                               Expanded(
-                                child: InkWell(
+                                child: _buildDatePickerCard(
+                                  label: '开始时间',
+                                  value: startTime.format(context),
+                                  icon: Icons.access_time,
                                   onTap: () async {
                                     final time = await showTimePicker(
                                       context: ctx,
@@ -1814,50 +1835,38 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                       setSheetState(() => startTime = time);
                                     }
                                   },
-                                  child: InputDecorator(
-                                    decoration: const InputDecoration(
-                                      labelText: '开始时间',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.access_time),
-                                    ),
-                                    child: Text(startTime.format(context)),
-                                  ),
                                 ),
                               ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.component),
                         Row(
                           children: [
                             Expanded(
-                              child: InkWell(
+                              child: _buildDatePickerCard(
+                                label: '结束日期',
+                                value: DateFormat('M月d日').format(endDate),
+                                icon: Icons.calendar_today,
                                 onTap: () async {
                                   final date = await showDatePicker(
                                     context: ctx,
                                     initialDate: endDate,
-                                    firstDate: DateTime.now()
-                                        .subtract(const Duration(days: 30)),
-                                    lastDate: DateTime.now()
-                                        .add(const Duration(days: 365)),
+                                    firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                                    lastDate: DateTime.now().add(const Duration(days: 365)),
                                   );
                                   if (date != null) {
                                     setSheetState(() => endDate = date);
                                   }
                                 },
-                                child: InputDecorator(
-                                  decoration: const InputDecoration(
-                                    labelText: '结束日期',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.calendar_today),
-                                  ),
-                                  child: Text(DateFormat('M月d日').format(endDate)),
-                                ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.md),
                             if (!isAllDay)
                               Expanded(
-                                child: InkWell(
+                                child: _buildDatePickerCard(
+                                  label: '结束时间',
+                                  value: endTime.format(context),
+                                  icon: Icons.access_time,
                                   onTap: () async {
                                     final time = await showTimePicker(
                                       context: ctx,
@@ -1867,84 +1876,57 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                       setSheetState(() => endTime = time);
                                     }
                                   },
-                                  child: InputDecorator(
-                                    decoration: const InputDecoration(
-                                      labelText: '结束时间',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.access_time),
-                                    ),
-                                    child: Text(endTime.format(context)),
-                                  ),
                                 ),
                               ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        TextField(
+                        const SizedBox(height: AppSpacing.component),
+                        AppInput(
                           controller: locationC,
-                          decoration: const InputDecoration(
-                            labelText: '地点（可选）',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.location_on),
-                          ),
+                          hintText: '地点（可选）',
+                          prefixIcon: const Icon(Icons.location_on, size: 20),
                         ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              if (titleC.text.trim().isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('请输入日程标题')),
-                                );
-                                return;
-                              }
-                              final schedule = Schedule(
-                                title: titleC.text.trim(),
-                                description: descC.text.trim().isEmpty
-                                    ? null
-                                    : descC.text.trim(),
-                                startTime: isAllDay
-                                    ? DateTime(
-                                        startDate.year,
-                                        startDate.month,
-                                        startDate.day,
-                                      )
-                                    : DateTime(
-                                        startDate.year,
-                                        startDate.month,
-                                        startDate.day,
-                                        startTime.hour,
-                                        startTime.minute,
-                                      ),
-                                endTime: isAllDay
-                                    ? DateTime(
-                                        endDate.year,
-                                        endDate.month,
-                                        endDate.day,
-                                        23,
-                                        59,
-                                      )
-                                    : DateTime(
-                                        endDate.year,
-                                        endDate.month,
-                                        endDate.day,
-                                        endTime.hour,
-                                        endTime.minute,
-                                      ),
-                                location: locationC.text.trim().isEmpty
-                                    ? null
-                                    : locationC.text.trim(),
+                        const SizedBox(height: AppSpacing.xl),
+                        AppButton(
+                          label: isEditing ? '保存日程' : '添加日程',
+                          icon: Icons.check,
+                          onPressed: () {
+                            if (titleC.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('请输入日程标题')),
                               );
-                              context
-                                  .read<ScheduleService>()
-                                  .createSchedule(schedule);
-                              Navigator.pop(ctx);
-                            },
-                            icon: const Icon(Icons.check),
-                            label: const Text('添加日程'),
-                          ),
+                              return;
+                            }
+                            final start = isAllDay
+                                ? DateTime(startDate.year, startDate.month, startDate.day)
+                                : DateTime(startDate.year, startDate.month, startDate.day, startTime.hour, startTime.minute);
+                            final end = isAllDay
+                                ? DateTime(endDate.year, endDate.month, endDate.day, 23, 59)
+                                : DateTime(endDate.year, endDate.month, endDate.day, endTime.hour, endTime.minute);
+                            final description = descC.text.trim().isEmpty ? null : descC.text.trim();
+                            final location = locationC.text.trim().isEmpty ? null : locationC.text.trim();
+
+                            if (isEditing) {
+                              final updated = schedule.copyWith(
+                                title: titleC.text.trim(),
+                                description: description,
+                                startTime: start,
+                                endTime: end,
+                                location: location,
+                              );
+                              context.read<ScheduleService>().updateSchedule(updated);
+                            } else {
+                              final newSchedule = Schedule(
+                                title: titleC.text.trim(),
+                                description: description,
+                                startTime: start,
+                                endTime: end,
+                                location: location,
+                              );
+                              context.read<ScheduleService>().createSchedule(newSchedule);
+                            }
+                            Navigator.pop(ctx);
+                          },
                         ),
                       ],
                     ),
@@ -1958,248 +1940,30 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     );
   }
 
-  void _showEditScheduleDialog(BuildContext context, Schedule schedule) {
-    final titleC = TextEditingController(text: schedule.title);
-    final descC = TextEditingController(text: schedule.description ?? '');
-    final locationC = TextEditingController(text: schedule.location ?? '');
-    DateTime startDate = schedule.startTime;
-    DateTime endDate = schedule.endTime;
-    TimeOfDay startTime = TimeOfDay.fromDateTime(schedule.startTime);
-    TimeOfDay endTime = TimeOfDay.fromDateTime(schedule.endTime);
-    bool isAllDay = schedule.startTime.hour == 0 && schedule.endTime.hour == 23;
-
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                child: Material(
-                  borderRadius: BorderRadius.circular(16),
-                  elevation: 8,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '编辑日程',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 20),
-                        TextField(
-                          controller: titleC,
-                          decoration: const InputDecoration(
-                            labelText: '日程标题',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.event),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: descC,
-                          decoration: const InputDecoration(
-                            labelText: '备注（可选）',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.description),
-                          ),
-                          maxLines: 2,
-                        ),
-                        const SizedBox(height: 12),
-                        SwitchListTile(
-                          title: const Text('全天'),
-                          value: isAllDay,
-                          onChanged: (v) =>
-                              setSheetState(() => isAllDay = v),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: InkWell(
-                                onTap: () async {
-                                  final date = await showDatePicker(
-                                    context: ctx,
-                                    initialDate: startDate,
-                                    firstDate: DateTime.now()
-                                        .subtract(const Duration(days: 30)),
-                                    lastDate: DateTime.now()
-                                        .add(const Duration(days: 365)),
-                                  );
-                                  if (date != null) {
-                                    setSheetState(() => startDate = date);
-                                  }
-                                },
-                                child: InputDecorator(
-                                  decoration: const InputDecoration(
-                                    labelText: '开始日期',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.calendar_today),
-                                  ),
-                                  child: Text(DateFormat('M月d日').format(startDate)),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            if (!isAllDay)
-                              Expanded(
-                                child: InkWell(
-                                  onTap: () async {
-                                    final time = await showTimePicker(
-                                      context: ctx,
-                                      initialTime: startTime,
-                                    );
-                                    if (time != null) {
-                                      setSheetState(() => startTime = time);
-                                    }
-                                  },
-                                  child: InputDecorator(
-                                    decoration: const InputDecoration(
-                                      labelText: '开始时间',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.access_time),
-                                    ),
-                                    child: Text(startTime.format(context)),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: InkWell(
-                                onTap: () async {
-                                  final date = await showDatePicker(
-                                    context: ctx,
-                                    initialDate: endDate,
-                                    firstDate: DateTime.now()
-                                        .subtract(const Duration(days: 30)),
-                                    lastDate: DateTime.now()
-                                        .add(const Duration(days: 365)),
-                                  );
-                                  if (date != null) {
-                                    setSheetState(() => endDate = date);
-                                  }
-                                },
-                                child: InputDecorator(
-                                  decoration: const InputDecoration(
-                                    labelText: '结束日期',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.calendar_today),
-                                  ),
-                                  child: Text(DateFormat('M月d日').format(endDate)),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            if (!isAllDay)
-                              Expanded(
-                                child: InkWell(
-                                  onTap: () async {
-                                    final time = await showTimePicker(
-                                      context: ctx,
-                                      initialTime: endTime,
-                                    );
-                                    if (time != null) {
-                                      setSheetState(() => endTime = time);
-                                    }
-                                  },
-                                  child: InputDecorator(
-                                    decoration: const InputDecoration(
-                                      labelText: '结束时间',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.access_time),
-                                    ),
-                                    child: Text(endTime.format(context)),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: locationC,
-                          decoration: const InputDecoration(
-                            labelText: '地点（可选）',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.location_on),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              if (titleC.text.trim().isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('请输入日程标题')),
-                                );
-                                return;
-                              }
-                              final updated = schedule.copyWith(
-                                title: titleC.text.trim(),
-                                description: descC.text.trim().isEmpty
-                                    ? null
-                                    : descC.text.trim(),
-                                startTime: isAllDay
-                                    ? DateTime(
-                                        startDate.year,
-                                        startDate.month,
-                                        startDate.day,
-                                      )
-                                    : DateTime(
-                                        startDate.year,
-                                        startDate.month,
-                                        startDate.day,
-                                        startTime.hour,
-                                        startTime.minute,
-                                      ),
-                                endTime: isAllDay
-                                    ? DateTime(
-                                        endDate.year,
-                                        endDate.month,
-                                        endDate.day,
-                                        23,
-                                        59,
-                                      )
-                                    : DateTime(
-                                        endDate.year,
-                                        endDate.month,
-                                        endDate.day,
-                                        endTime.hour,
-                                        endTime.minute,
-                                      ),
-                                location: locationC.text.trim().isEmpty
-                                    ? null
-                                    : locationC.text.trim(),
-                              );
-                              context
-                                  .read<ScheduleService>()
-                                  .updateSchedule(updated);
-                              Navigator.pop(ctx);
-                            },
-                            icon: const Icon(Icons.check),
-                            label: const Text('保存日程'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
+  Widget _buildDatePickerCard({
+    required String label,
+    required String value,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return AppCard(
+      shadows: const [],
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.secondaryText),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppTypography.smallLight()),
+                Text(value, style: AppTypography.bodyMediumLight()),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

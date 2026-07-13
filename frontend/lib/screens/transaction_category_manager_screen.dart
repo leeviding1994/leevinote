@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:leevinote/design/app_theme.dart';
 import 'package:leevinote/models/transaction_category.dart';
 import 'package:leevinote/services/local_transaction_category_service.dart';
+import 'package:leevinote/widgets/widgets.dart';
 
 class TransactionCategoryManagerScreen extends StatefulWidget {
   const TransactionCategoryManagerScreen({super.key});
@@ -27,7 +29,7 @@ class _TransactionCategoryManagerScreenState
     final isEdit = category != null;
     final nameC = TextEditingController(text: category?.name ?? '');
     String? selectedIcon = category?.icon ?? 'food';
-    String? selectedColor = category?.color ?? '#FF2196F3';
+    String? selectedColor = category?.color ?? '#FF6366F1';
 
     final icons = [
       ('food', Icons.restaurant),
@@ -44,110 +46,129 @@ class _TransactionCategoryManagerScreenState
     ];
 
     final colors = [
-      '#FF2196F3',
-      '#FF4CAF50',
-      '#FFFF9800',
-      '#FF9C27B0',
-      '#FFE91E63',
-      '#FF00BCD4',
+      '#FF6366F1',
+      '#FF10B981',
+      '#FFF59E0B',
+      '#FF8B5CF6',
+      '#FFEC4899',
+      '#FF06B6D4',
       '#FF795548',
       '#FF607D8B',
-      '#FFF44336',
-      '#FF3F51B5',
+      '#FFEF4444',
+      '#FF3B82F6',
     ];
 
     final result = await showDialog<Map<String, String>?>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          return AlertDialog(
-            title: Text(isEdit ? '编辑分类' : '新增分类'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: nameC,
-                    autofocus: true,
-                    decoration: const InputDecoration(labelText: '分类名称'),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('图标', style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: icons.map((item) {
-                      final (key, icon) = item;
-                      final selected = selectedIcon == key;
-                      return InkWell(
-                        onTap: () => setDialogState(() => selectedIcon = key),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? Theme.of(context).colorScheme.primaryContainer
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isEdit ? '编辑分类' : '新增分类',
+                      style: AppTypography.h2Light(),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    AppInput(
+                      controller: nameC,
+                      hintText: '分类名称',
+                      autofocus: true,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text('图标', style: AppTypography.captionMediumLight()),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: icons.map((item) {
+                        final (key, icon) = item;
+                        final selected = selectedIcon == key;
+                        return GestureDetector(
+                          onTap: () => setDialogState(() => selectedIcon = key),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            decoration: BoxDecoration(
                               color: selected
-                                  ? Theme.of(context).colorScheme.primary
+                                  ? Theme.of(context).colorScheme.primaryContainer
                                   : Colors.transparent,
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              border: Border.all(
+                                color: selected
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.transparent,
+                              ),
+                            ),
+                            child: Icon(icon, size: 24),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text('颜色', style: AppTypography.captionMediumLight()),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: colors.map((c) {
+                        final selected = selectedColor == c;
+                        final color = Color(int.parse(c.replaceFirst('#', '0xFF')));
+                        return GestureDetector(
+                          onTap: () => setDialogState(() => selectedColor = c),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: selected ? AppColors.primaryText : Colors.transparent,
+                                width: 2,
+                              ),
                             ),
                           ),
-                          child: Icon(icon, size: 24),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('颜色', style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: colors.map((c) {
-                      final selected = selectedColor == c;
-                      final color = Color(int.parse(c.replaceFirst('#', '0xFF')));
-                      return InkWell(
-                        onTap: () => setDialogState(() => selectedColor = c),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: selected ? Colors.black : Colors.transparent,
-                              width: 2,
-                            ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AppButton.secondary(
+                            label: '取消',
+                            onPressed: () => Navigator.pop(ctx),
                           ),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                ],
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: AppButton(
+                            label: '保存',
+                            onPressed: () {
+                              final name = nameC.text.trim();
+                              if (name.isEmpty) return;
+                              Navigator.pop(ctx, {
+                                'name': name,
+                                'icon': selectedIcon ?? 'other',
+                                'color': selectedColor ?? '#FF6366F1',
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('取消'),
-              ),
-              TextButton(
-                onPressed: () {
-                  final name = nameC.text.trim();
-                  if (name.isEmpty) return;
-                  Navigator.pop(ctx, {
-                    'name': name,
-                    'icon': selectedIcon ?? 'other',
-                    'color': selectedColor ?? '#FF2196F3',
-                  });
-                },
-                child: const Text('保存'),
-              ),
-            ],
           );
         },
       ),
@@ -177,16 +198,12 @@ class _TransactionCategoryManagerScreenState
 
   Future<void> _deleteCategory(TransactionCategory category) async {
     final service = context.read<LocalTransactionCategoryService>();
-    final confirm = await showDialog<bool>(
+    final confirm = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除分类'),
-        content: Text('确定要删除分类"${category.name}"吗？该分类下的记录将保留但不再显示分类。'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定')),
-        ],
-      ),
+      title: '删除分类',
+      content: '确定要删除分类"${category.name}"吗？该分类下的记录将保留但不再显示分类。',
+      confirmLabel: '删除',
+      destructive: true,
     );
     if (confirm == true) {
       await service.deleteCategory(category.localId);
@@ -200,108 +217,130 @@ class _TransactionCategoryManagerScreenState
         .where((c) => c.type == (_isExpenseType ? 'expense' : 'income'))
         .toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('分类管理'),
+    return AppScaffold.noPadding(
+      appBar: AppAppBar(
+        title: '分类管理',
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
+          preferredSize: const Size.fromHeight(64),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pageHorizontal,
+              0,
+              AppSpacing.pageHorizontal,
+              AppSpacing.md,
+            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ChoiceChip(
-                  label: const Text('支出分类'),
-                  selected: _isExpenseType,
-                  selectedColor: Colors.red,
-                  labelStyle: TextStyle(color: _isExpenseType ? Colors.white : Colors.red, fontWeight: FontWeight.w600),
-                  onSelected: (_) => setState(() => _isExpenseType = true),
-                ),
-                const SizedBox(width: 12),
-                ChoiceChip(
-                  label: const Text('收入分类'),
-                  selected: !_isExpenseType,
-                  selectedColor: Colors.green,
-                  labelStyle: TextStyle(color: !_isExpenseType ? Colors.white : Colors.green, fontWeight: FontWeight.w600),
-                  onSelected: (_) => setState(() => _isExpenseType = false),
-                ),
+                _buildTypeChip(label: '支出分类', isExpense: true),
+                const SizedBox(width: AppSpacing.md),
+                _buildTypeChip(label: '收入分类', isExpense: false),
               ],
             ),
           ),
         ),
       ),
       body: ListView.builder(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(AppSpacing.pageHorizontal),
         itemCount: categories.length,
         itemBuilder: (context, index) {
           final c = categories[index];
           final color = _parseColor(c.color);
-          return Card(
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: color.withValues(alpha: 0.15),
-                child: Icon(_parseIcon(c.icon), color: color),
-              ),
-              title: Text(c.name),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () => _addOrEditCategory(c),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => _deleteCategory(c),
-                  ),
-                ],
+          return AnimatedListItem(
+            index: index,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.listItemGap),
+              child: AppCard(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Icon(_parseIcon(c.icon), color: color),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(child: Text(c.name, style: AppTypography.bodyLight())),
+                    AppIconButton(
+                      icon: Icons.edit,
+                      onPressed: () => _addOrEditCategory(c),
+                    ),
+                    AppIconButton(
+                      icon: Icons.delete_outline,
+                      onPressed: () => _deleteCategory(c),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: AppFAB(
         onPressed: () => _addOrEditCategory(null),
-        child: const Icon(Icons.add),
+        icon: Icons.add,
+      ),
+    );
+  }
+
+  Widget _buildTypeChip({required String label, required bool isExpense}) {
+    final selected = _isExpenseType == isExpense;
+    final color = isExpense ? AppColors.error : AppColors.success;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      decoration: BoxDecoration(
+        color: selected ? color : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          onTap: () => setState(() => _isExpenseType = isExpense),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            child: Text(
+              label,
+              style: AppTypography.bodyMediumLight(
+                color: selected ? Colors.white : color,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
   IconData _parseIcon(String? iconName) {
     switch (iconName) {
-      case 'food':
-        return Icons.restaurant;
-      case 'transport':
-        return Icons.directions_car;
-      case 'shopping':
-        return Icons.shopping_bag;
-      case 'entertainment':
-        return Icons.movie;
-      case 'housing':
-        return Icons.home;
-      case 'medical':
-        return Icons.local_hospital;
-      case 'education':
-        return Icons.school;
-      case 'salary':
-        return Icons.account_balance_wallet;
-      case 'bonus':
-        return Icons.card_giftcard;
-      case 'investment':
-        return Icons.trending_up;
-      default:
-        return Icons.label;
+      case 'food': return Icons.restaurant;
+      case 'transport': return Icons.directions_car;
+      case 'shopping': return Icons.shopping_bag;
+      case 'entertainment': return Icons.movie;
+      case 'housing': return Icons.home;
+      case 'medical': return Icons.local_hospital;
+      case 'education': return Icons.school;
+      case 'salary': return Icons.account_balance_wallet;
+      case 'bonus': return Icons.card_giftcard;
+      case 'investment': return Icons.trending_up;
+      default: return Icons.label;
     }
   }
 
   Color _parseColor(String? colorString) {
-    if (colorString == null || colorString.isEmpty) {
-      return Colors.grey;
-    }
+    if (colorString == null || colorString.isEmpty) return AppColors.secondaryText;
     try {
       return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
     } catch (_) {
-      return Colors.grey;
+      return AppColors.secondaryText;
     }
   }
 }

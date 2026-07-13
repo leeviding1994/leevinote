@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:leevinote/design/app_theme.dart';
 import 'package:leevinote/services/settings_service.dart';
 import 'package:leevinote/services/auth_service.dart';
 import 'package:leevinote/services/local_note_service.dart';
 import 'package:leevinote/services/local_folder_service.dart';
-import 'package:leevinote/screens/login_screen.dart';
+import 'package:leevinote/widgets/widgets.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -19,43 +21,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsService>();
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
+
+    return AppScaffold.noPadding(
+      appBar: AppAppBar(
+        title: '设置',
         actions: [
-          IconButton(
-            icon: _syncing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.sync),
+          AppIconButton(
+            icon: _syncing ? Icons.hourglass_empty : Icons.sync,
             onPressed: _syncing ? null : () => _manualSync(settings),
           ),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
         children: [
           _buildSectionHeader('外观'),
           _buildThemeTile(settings),
           _buildThemeColorTile(settings),
-          const Divider(),
+          const SizedBox(height: AppSpacing.module),
           _buildSectionHeader('布局'),
           _buildModuleSortTile(settings),
           _buildModuleVisibilityTile(settings),
-          const Divider(),
+          const SizedBox(height: AppSpacing.module),
           _buildSectionHeader('其他'),
-          ListTile(
-            leading: const Icon(Icons.cleaning_services),
-            title: const Text('清除本地笔记数据'),
-            subtitle: const Text('删除所有本地缓存的笔记和文件夹'),
-            onTap: () => _confirmClearLocalData(),
+          _buildDangerTile(
+            icon: Icons.cleaning_services_outlined,
+            title: '清除本地笔记数据',
+            subtitle: '删除所有本地缓存的笔记和文件夹',
+            onTap: _confirmClearLocalData,
           ),
-          ListTile(
-            leading: const Icon(Icons.restore),
-            title: const Text('恢复默认设置'),
+          _buildDangerTile(
+            icon: Icons.restore_outlined,
+            title: '恢复默认设置',
+            subtitle: '所有自定义设置将被重置',
             onTap: () => _confirmReset(settings),
           ),
         ],
@@ -65,14 +63,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageHorizontal,
+        AppSpacing.sm,
+        AppSpacing.pageHorizontal,
+        AppSpacing.sm,
+      ),
       child: Text(
         title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
-        ),
+        style: AppTypography.captionMediumLight(color: AppColors.brand),
       ),
     );
   }
@@ -83,10 +82,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       AppThemeMode.light: '浅色',
       AppThemeMode.dark: '深色',
     };
-    return ListTile(
+    return AppListTile(
       leading: const Icon(Icons.dark_mode_outlined),
-      title: const Text('主题'),
-      subtitle: Text(labels[settings.themeMode] ?? ''),
+      title: '主题',
+      subtitle: labels[settings.themeMode] ?? '',
       onTap: () => _showThemePicker(settings),
     );
   }
@@ -96,30 +95,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('选择主题', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              ),
-              for (final mode in AppThemeMode.values)
-                RadioListTile<AppThemeMode>(
-                  title: Text({
-                    AppThemeMode.system: '跟随系统',
-                    AppThemeMode.light: '浅色',
-                    AppThemeMode.dark: '深色',
-                  }[mode]!),
-                  value: mode,
-                  groupValue: settings.themeMode,
-                  onChanged: (v) {
-                    if (v != null) {
-                      settings.setThemeMode(v);
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('选择主题', style: AppTypography.h2Light()),
+                const SizedBox(height: AppSpacing.lg),
+                for (final mode in AppThemeMode.values)
+                  AppListTile(
+                    leading: Icon(
+                      mode == AppThemeMode.dark
+                          ? Icons.dark_mode_outlined
+                          : mode == AppThemeMode.light
+                              ? Icons.light_mode_outlined
+                              : Icons.settings_brightness_outlined,
+                    ),
+                    title: {
+                      AppThemeMode.system: '跟随系统',
+                      AppThemeMode.light: '浅色',
+                      AppThemeMode.dark: '深色',
+                    }[mode]!,
+                    trailing: settings.themeMode == mode
+                        ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                        : null,
+                    onTap: () {
+                      settings.setThemeMode(mode);
                       Navigator.pop(ctx);
-                    }
-                  },
-                ),
-            ],
+                    },
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -127,25 +134,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildThemeColorTile(SettingsService settings) {
-    return ListTile(
+    return AppListTile(
       leading: const Icon(Icons.color_lens_outlined),
-      title: const Text('主题颜色'),
-      subtitle: Wrap(
-        spacing: 4,
+      title: '主题颜色',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: settings.availableColors.map((c) {
-          final isSelected = c.value == settings.themeColor.value;
+          final isSelected = c.toARGB32() == settings.themeColor.toARGB32();
           return Container(
-            width: 16,
-            height: 16,
+            width: 18,
+            height: 18,
+            margin: const EdgeInsets.only(left: AppSpacing.xs),
             decoration: BoxDecoration(
               color: c,
               shape: BoxShape.circle,
               border: isSelected
-                  ? Border.all(color: Colors.white, width: 2)
+                  ? Border.all(color: Theme.of(context).colorScheme.surface, width: 2)
                   : null,
-              boxShadow: isSelected
-                  ? [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 4)]
-                  : null,
+              boxShadow: isSelected ? AppShadows.input : null,
             ),
           );
         }).toList(),
@@ -160,35 +166,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('选择主题颜色', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
+                Text('选择主题颜色', style: AppTypography.h2Light()),
+                const SizedBox(height: AppSpacing.lg),
                 Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.md,
                   children: settings.availableColors.map((c) {
-                    final isSelected = c.value == settings.themeColor.value;
+                    final isSelected = c.toARGB32() == settings.themeColor.toARGB32();
                     return GestureDetector(
                       onTap: () {
                         settings.setThemeColor(c);
                         Navigator.pop(ctx);
                       },
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
                           color: c,
                           shape: BoxShape.circle,
-                          border: isSelected
-                              ? Border.all(color: Colors.white, width: 3)
-                              : Border.all(color: Colors.grey.shade300, width: 1),
-                          boxShadow: isSelected
-                              ? [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 8)]
-                              : null,
+                          border: Border.all(
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.surface
+                                : Colors.transparent,
+                            width: 3,
+                          ),
+                          boxShadow: isSelected ? AppShadows.medium : null,
                         ),
                         child: isSelected
                             ? const Icon(Icons.check, color: Colors.white)
@@ -197,7 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
               ],
             ),
           ),
@@ -207,21 +215,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildModuleSortTile(SettingsService settings) {
-    return ListTile(
+    return AppListTile(
       leading: const Icon(Icons.reorder),
-      title: const Text('模块排序'),
-      subtitle: Text(settings.modules.map((m) => m.label).join(' / ')),
+      title: '模块排序',
+      subtitle: settings.modules.map((m) => m.label).join(' / '),
       onTap: () => _showModuleSortSheet(settings),
     );
   }
 
   Widget _buildModuleVisibilityTile(SettingsService settings) {
-    final visibleCount = settings.moduleVisibility.values.where((v) => v).length - 1; // exclude profile
-    final totalCount = settings.moduleVisibility.length - 1; // exclude profile
-    return ListTile(
+    final visibleCount = settings.moduleVisibility.values.where((v) => v).length - 1;
+    final totalCount = settings.moduleVisibility.length - 1;
+    return AppListTile(
       leading: const Icon(Icons.visibility_outlined),
-      title: const Text('模块显示'),
-      subtitle: Text('$visibleCount / $totalCount 个模块显示（"我的"必显）'),
+      title: '模块显示',
+      subtitle: '$visibleCount / $totalCount 个模块显示（"我的"必显）',
       onTap: () => _showModuleVisibilitySheet(settings),
     );
   }
@@ -237,43 +245,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
           builder: (ctx, setSheetState) {
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppSpacing.xl),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Text('模块显示', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text('模块显示', style: AppTypography.h2Light()),
                         const Spacer(),
-                        TextButton(
+                        AppButton.secondary(
+                          label: '完成',
                           onPressed: () => Navigator.pop(ctx),
-                          child: const Text('完成'),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    const Text('"我的"模块必显且固定在最后', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      '"我的"模块必显且固定在最后',
+                      style: AppTypography.smallLight(),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
                     ListView.separated(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: moduleMap.length - 1, // exclude profile
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemCount: moduleMap.length - 1,
+                      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.listItemGap),
                       itemBuilder: (context, index) {
                         final module = moduleMap.values.elementAt(index);
                         if (module.id == 'profile') return const SizedBox.shrink();
                         final isVisible = visibility[module.id] ?? true;
-                        return SwitchListTile(
-                          secondary: Icon(module.icon),
-                          title: Text(module.label),
-                          value: isVisible,
-                          onChanged: (value) {
-                            setSheetState(() {
-                              visibility[module.id] = value;
-                            });
-                            settings.setModuleVisibility(module.id, value);
-                          },
+                        return AppCard(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.lg,
+                            vertical: AppSpacing.sm,
+                          ),
+                          shadows: const [],
+                          child: Row(
+                            children: [
+                              Icon(module.icon),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(child: Text(module.label, style: AppTypography.bodyLight())),
+                              Switch(
+                                value: isVisible,
+                                onChanged: (value) {
+                                  setSheetState(() {
+                                    visibility[module.id] = value;
+                                  });
+                                  settings.setModuleVisibility(module.id, value);
+                                },
+                              ),
+                            ],
+                          ),
                         );
                       },
                     ),
@@ -288,48 +311,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showModuleSortSheet(SettingsService settings) {
-    final order = List<String>.from(settings.moduleOrder);
+    final moduleMap = {for (final m in settings.allModules) m.id: m};
+    final savedOrder = settings.moduleOrder.where((id) => moduleMap.containsKey(id)).toList();
+    final defaultOrder = settings.allModules.map((m) => m.id).toList();
+    final order = List<String>.from(
+      savedOrder.length == defaultOrder.length ? savedOrder : defaultOrder,
+    );
+    if (savedOrder.length != defaultOrder.length) {
+      // 本地/服务器数据异常，重置为默认顺序
+      settings.setModuleOrder(defaultOrder);
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
-            final moduleMap = {for (final m in settings.allModules) m.id: m};
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppSpacing.xl),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Text('模块排序', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text('模块排序', style: AppTypography.h2Light()),
                         const Spacer(),
-                        TextButton(
-                          onPressed: () => settings.setModuleOrder(order),
-                          child: const Text('保存'),
+                        AppButton.secondary(
+                          label: '保存',
+                          onPressed: () {
+                            settings.setModuleOrder(order);
+                            Navigator.pop(ctx);
+                          },
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    const Text('长按拖拽调整顺序', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      '长按拖拽调整顺序',
+                      style: AppTypography.smallLight(),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
                     ReorderableListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: order.length,
                       itemBuilder: (context, index) {
                         final id = order[index];
-                        final m = moduleMap[id]!;
-                        return Card(
+                        final m = moduleMap[id];
+                        if (m == null) return const SizedBox.shrink(key: ValueKey(''));
+                        return AppCard(
                           key: ValueKey(id),
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            leading: Icon(m.icon),
-                            title: Text(m.label),
-                            trailing: const Icon(Icons.drag_handle),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.lg,
+                            vertical: AppSpacing.md,
+                          ),
+                          shadows: const [],
+                          child: Row(
+                            children: [
+                              Icon(m.icon),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(child: Text(m.label, style: AppTypography.bodyLight())),
+                              const Icon(Icons.drag_handle, color: AppColors.tertiaryText),
+                            ],
                           ),
                         );
                       },
@@ -351,12 +396,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildDangerTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return AppListTile(
+      leading: Icon(icon, color: AppColors.error),
+      title: title,
+      subtitle: subtitle,
+      onTap: onTap,
+    );
+  }
+
   Future<void> _manualSync(SettingsService settings) async {
     final auth = context.read<AuthService>();
     if (!auth.isAuthenticated) {
       final loggedIn = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        AppPageRoute(builder: (_) => const LoginScreen()),
       );
       if (loggedIn != true) return;
     }
@@ -381,61 +440,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _confirmClearLocalData() {
-    showDialog(
+    AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('清除本地笔记数据'),
-        content: const Text('将删除所有本地缓存的笔记和文件夹，同步后会重新从服务器拉取。确定继续吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final noteService = context.read<LocalNoteService>();
-              final folderService = context.read<LocalFolderService>();
-              await noteService.clearAll();
-              await folderService.clearAll();
-              Navigator.pop(ctx);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('本地数据已清除')),
-                );
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('清除'),
-          ),
-        ],
-      ),
-    );
+      title: '清除本地笔记数据',
+      content: '将删除所有本地缓存的笔记和文件夹，同步后会重新从服务器拉取。确定继续吗？',
+      confirmLabel: '清除',
+      destructive: true,
+    ).then((confirmed) async {
+      if (confirmed != true || !mounted) return;
+      final noteService = context.read<LocalNoteService>();
+      final folderService = context.read<LocalFolderService>();
+      await noteService.clearAll();
+      await folderService.clearAll();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('本地数据已清除')),
+        );
+      }
+    });
   }
 
   void _confirmReset(SettingsService settings) {
-    showDialog(
+    AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('恢复默认设置'),
-        content: const Text('所有自定义设置将被重置，确定继续吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              settings.resetToDefault();
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('已恢复默认设置')),
-              );
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('恢复'),
-          ),
-        ],
-      ),
-    );
+      title: '恢复默认设置',
+      content: '所有自定义设置将被重置，确定继续吗？',
+      confirmLabel: '恢复',
+      destructive: true,
+    ).then((confirmed) {
+      if (confirmed != true || !mounted) return;
+      settings.resetToDefault();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已恢复默认设置')),
+      );
+    });
   }
 }

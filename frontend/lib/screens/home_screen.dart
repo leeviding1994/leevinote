@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:leevinote/design/app_theme.dart';
 import 'package:leevinote/models/folder.dart';
 import 'package:leevinote/screens/notes_screen.dart';
 import 'package:leevinote/screens/alarms_screen.dart';
@@ -12,6 +13,7 @@ import 'package:leevinote/screens/settings_screen.dart';
 import 'package:leevinote/services/auth_service.dart';
 import 'package:leevinote/services/settings_service.dart';
 import 'package:leevinote/services/local_folder_service.dart';
+import 'package:leevinote/widgets/widgets.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -45,20 +47,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final modules = settings.modules;
     final ids = modules.map((m) => m.id).toList();
 
-    // 如果当前索引越界（如隐藏了当前模块），重置到第一个
     if (_currentIndex >= ids.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _currentIndex = 0);
       });
     }
-    // 根据 moduleOrder 确定当前选中模块的索引
+
     final selectedModuleId = ids.isNotEmpty ? ids[_currentIndex] : 'notes';
     final isNotes = selectedModuleId == 'notes';
     final isSchedules = selectedModuleId == 'schedules';
     final isTransactions = selectedModuleId == 'transactions';
     final isProfile = selectedModuleId == 'profile';
 
-    // 构建标题
     final title = isNotes && _notesKey.currentState != null
         ? _notesKey.currentState!.buildBreadcrumbWidget()
         : isSchedules
@@ -68,68 +68,60 @@ class _HomeScreenState extends State<HomeScreen> {
               )
             : Text(modules[_currentIndex].label);
 
-    // 构建 actions
-    final actions = <Widget>[];
-    if (isNotes) {
-      actions.add(IconButton(
-        icon: const Icon(Icons.sync),
-        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-        onPressed: () => _notesKey.currentState?.sync(),
-      ));
-    }
-    if (isSchedules) {
-      actions.add(IconButton(
-        icon: const Icon(Icons.search),
-        tooltip: '搜索日程',
-        onPressed: () => _schedulesKey.currentState?.toggleSearch(),
-      ));
-      actions.add(IconButton(
-        icon: const Icon(Icons.sync),
-        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-        onPressed: () => _schedulesKey.currentState?.sync(),
-      ));
-    }
-    if (isProfile) {
-      actions.add(IconButton(
-        icon: const Icon(Icons.settings_outlined),
-        tooltip: '设置',
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    final actions = <Widget>[
+      if (isNotes)
+        AppIconButton(
+          icon: Icons.sync,
+          tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+          onPressed: () => _notesKey.currentState?.sync(),
         ),
-      ));
-    }
-    // 其他模块（闹钟、音乐、视频）的同步按钮
-    if (selectedModuleId == 'alarms') {
-      actions.add(IconButton(
-        icon: const Icon(Icons.sync),
-        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-        onPressed: () => _alarmsKey.currentState?.sync(),
-      ));
-    }
-    if (selectedModuleId == 'music') {
-      actions.add(IconButton(
-        icon: const Icon(Icons.sync),
-        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-        onPressed: () => _musicKey.currentState?.sync(),
-      ));
-    }
-    if (selectedModuleId == 'videos') {
-      actions.add(IconButton(
-        icon: const Icon(Icons.sync),
-        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-        onPressed: () => _videosKey.currentState?.sync(),
-      ));
-    }
-    if (selectedModuleId == 'transactions') {
-      actions.add(IconButton(
-        icon: const Icon(Icons.sync),
-        tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-        onPressed: () => _transactionsKey.currentState?.sync(),
-      ));
-    }
+      if (isSchedules) ...[
+        AppIconButton(
+          icon: Icons.search,
+          tooltip: '搜索日程',
+          onPressed: () => _schedulesKey.currentState?.toggleSearch(),
+        ),
+        AppIconButton(
+          icon: Icons.sync,
+          tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+          onPressed: () => _schedulesKey.currentState?.sync(),
+        ),
+      ],
+      if (isProfile)
+        AppIconButton(
+          icon: Icons.settings_outlined,
+          tooltip: '设置',
+          onPressed: () => Navigator.push(
+            context,
+            AppPageRoute(builder: (_) => const SettingsScreen()),
+          ),
+        ),
+      if (selectedModuleId == 'alarms')
+        AppIconButton(
+          icon: Icons.sync,
+          tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+          onPressed: () => _alarmsKey.currentState?.sync(),
+        ),
+      if (selectedModuleId == 'music')
+        AppIconButton(
+          icon: Icons.sync,
+          tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+          onPressed: () => _musicKey.currentState?.sync(),
+        ),
+      if (selectedModuleId == 'videos')
+        AppIconButton(
+          icon: Icons.sync,
+          tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+          onPressed: () => _videosKey.currentState?.sync(),
+        ),
+      if (selectedModuleId == 'transactions')
+        AppIconButton(
+          icon: Icons.sync,
+          tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
+          onPressed: () => _transactionsKey.currentState?.sync(),
+        ),
+    ];
 
-    // 构建 IndexedStack children
     final widgetMap = {
       'notes': NotesScreen(key: _notesKey),
       'alarms': AlarmsScreen(key: _alarmsKey),
@@ -142,8 +134,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final children = ids.map((id) => widgetMap[id]!).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: title,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppAppBar(
+        titleWidget: title,
         actions: actions,
       ),
       drawer: isNotes ? _buildFolderDrawer() : null,
@@ -152,30 +145,26 @@ class _HomeScreenState extends State<HomeScreen> {
         children: children,
       ),
       floatingActionButton: isNotes
-          ? FloatingActionButton(
+          ? AppFAB(
               heroTag: 'notes_fab',
               onPressed: () => _notesKey.currentState?.openEditor(
                 null,
                 defaultLocalFolderId: _notesKey.currentState?.selectedLocalFolderId,
               ),
-              child: const Icon(Icons.add),
+              icon: Icons.add,
             )
           : isTransactions
-              ? FloatingActionButton(
+              ? AppFAB(
                   heroTag: 'transactions_fab',
-                  backgroundColor: Colors.orange.shade500,
+                  backgroundColor: AppColors.brand,
                   foregroundColor: Colors.white,
                   onPressed: () => _transactionsKey.currentState?.openEditor(null),
-                  child: const Icon(Icons.add),
+                  icon: Icons.add,
                 )
               : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onDestinationSelected: (index) => setState(() => _currentIndex = index),
         destinations: modules.map((m) => NavigationDestination(
           icon: Icon(m.icon),
           label: m.label,
@@ -203,19 +192,19 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SafeArea(
         child: Column(
           children: [
-            ListTile(
+            AppListTile(
               leading: const Icon(Icons.notes),
-              title: const Text('全部笔记'),
+              title: '全部笔记',
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.create_new_folder_outlined),
+                  AppIconButton(
+                    icon: Icons.create_new_folder_outlined,
                     tooltip: '新建文件夹',
                     onPressed: () => _addFolder(null),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
+                  AppIconButton(
+                    icon: Icons.close,
                     tooltip: '关闭',
                     onPressed: () => Navigator.pop(context),
                   ),
@@ -244,14 +233,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Map<String?, List<Folder>> childrenMap, {
     int depth = 0,
   }) {
-    final leftPadding = 16.0 + depth * 24.0;
+    final leftPadding = AppSpacing.pageHorizontal + depth * 24.0;
     final result = <Widget>[];
-    
+
     for (final folder in folders) {
       final children = childrenMap[folder.localId] ?? const <Folder>[];
       final hasChildren = children.isNotEmpty;
       final isExpanded = _expandedFolders.contains(folder.localId);
-      
+
       result.add(
         InkWell(
           onLongPress: () => _showFolderMenu(folder),
@@ -260,7 +249,12 @@ class _HomeScreenState extends State<HomeScreen> {
             _notesKey.currentState?.selectFolder(folder.localId);
           },
           child: Padding(
-            padding: EdgeInsets.only(left: leftPadding, right: 16, top: 8, bottom: 8),
+            padding: EdgeInsets.only(
+              left: leftPadding,
+              right: AppSpacing.pageHorizontal,
+              top: AppSpacing.sm,
+              bottom: AppSpacing.sm,
+            ),
             child: Row(
               children: [
                 if (hasChildren)
@@ -275,29 +269,36 @@ class _HomeScreenState extends State<HomeScreen> {
                       });
                     },
                     child: Padding(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       child: Icon(
                         isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
                         size: 20,
+                        color: AppColors.secondaryText,
                       ),
                     ),
                   )
                 else
                   const SizedBox(width: 28),
-                const Icon(Icons.folder, size: 20),
-                const SizedBox(width: 12),
-                Expanded(child: Text(folder.name, overflow: TextOverflow.ellipsis)),
+                const Icon(Icons.folder_outlined, size: 20, color: AppColors.brand),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(
+                    folder.name,
+                    style: AppTypography.bodyLight(),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ),
         ),
       );
-      
+
       if (hasChildren && isExpanded) {
         result.addAll(_buildDrawerFolderTree(children, childrenMap, depth: depth + 1));
       }
     }
-    
+
     return result;
   }
 
@@ -306,29 +307,41 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       position: const RelativeRect.fromLTRB(100, 200, 100, 200),
       items: [
-        const PopupMenuItem(value: 'note', child: ListTile(
-          leading: Icon(Icons.note_add, size: 20),
-          title: Text('新建笔记'),
-          dense: true,
-        )),
-        const PopupMenuItem(value: 'subfolder', child: ListTile(
-          leading: Icon(Icons.create_new_folder_outlined, size: 20),
-          title: Text('新建子文件夹'),
-          dense: true,
-        )),
-        const PopupMenuItem(value: 'delete', child: ListTile(
-          leading: Icon(Icons.delete_outline, size: 20),
-          title: Text('删除文件夹'),
-          dense: true,
-        )),
-        const PopupMenuItem(value: 'move', child: ListTile(
-          leading: Icon(Icons.drive_file_move_outline, size: 20),
-          title: Text('移动'),
-          dense: true,
-        )),
+        const PopupMenuItem(
+          value: 'note',
+          child: AppListTile(
+            leading: Icon(Icons.note_add, size: 20),
+            title: '新建笔记',
+            padding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'subfolder',
+          child: AppListTile(
+            leading: Icon(Icons.create_new_folder_outlined, size: 20),
+            title: '新建子文件夹',
+            padding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'delete',
+          child: AppListTile(
+            leading: Icon(Icons.delete_outline, size: 20),
+            title: '删除文件夹',
+            padding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'move',
+          child: AppListTile(
+            leading: Icon(Icons.drive_file_move_outline, size: 20),
+            title: '移动',
+            padding: EdgeInsets.zero,
+          ),
+        ),
       ],
     ).then((value) {
-      if (value == null) return;
+      if (value == null || !mounted) return;
       switch (value) {
         case 'note':
           Navigator.pop(context);
@@ -348,20 +361,52 @@ class _HomeScreenState extends State<HomeScreen> {
     final nameC = TextEditingController();
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(parent == null ? '新建文件夹' : '在"${parent.name}"下新建'),
-        content: TextField(
-          controller: nameC,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '文件夹名称'),
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  parent == null ? '新建文件夹' : '在"${parent.name}"下新建',
+                  style: AppTypography.h2Light(),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                AppInput(
+                  controller: nameC,
+                  hintText: '文件夹名称',
+                  autofocus: true,
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton.secondary(
+                        label: '取消',
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: AppButton(
+                        label: '确定',
+                        onPressed: () => Navigator.pop(ctx, nameC.text.trim()),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, nameC.text.trim()), child: const Text('确定')),
-        ],
       ),
     );
     if (result != null && result.isNotEmpty) {
+      if (!mounted) return;
       final folderService = context.read<LocalFolderService>();
       await folderService.addFolder(Folder(
         name: result,
@@ -372,18 +417,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _deleteFolder(Folder folder) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除文件夹'),
-        content: Text('确定要删除文件夹"${folder.name}"吗？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定')),
-        ],
-      ),
+      title: '删除文件夹',
+      content: '确定要删除文件夹"${folder.name}"吗？',
+      confirmLabel: '删除',
+      destructive: true,
     );
     if (confirm == true) {
+      if (!mounted) return;
       final folderService = context.read<LocalFolderService>();
       await folderService.deleteFolder(folder.localId);
     }

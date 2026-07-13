@@ -48,14 +48,14 @@ const _defaultModuleVisibility = {
 };
 
 const _themeColors = [
-  Color(0xFF2196F3), // 天蓝（默认）
-  Color(0xFF4CAF50), // 绿色
-  Color(0xFFFF9800), // 橙色
-  Color(0xFF9C27B0), // 紫色
-  Color(0xFFE91E63), // 粉色
-  Color(0xFF00BCD4), // 青色
-  Color(0xFF795548), // 棕色
-  Color(0xFF607D8B), // 蓝灰
+  Color(0xFF6366F1), // 蓝紫（默认）
+  Color(0xFF8B5CF6), // 紫罗兰
+  Color(0xFF3B82F6), // 蓝色
+  Color(0xFF10B981), // 翠绿色
+  Color(0xFFF59E0B), // 琥珀色
+  Color(0xFFEF4444), // 红色
+  Color(0xFFEC4899), // 粉色
+  Color(0xFF06B6D4), // 青色
 ];
 
 class SettingsService extends ChangeNotifier {
@@ -77,11 +77,12 @@ class SettingsService extends ChangeNotifier {
   List<NavModule> get modules {
     final map = {for (final m in _defaultModules) m.id: m};
     final visibleModules = _moduleOrder
-        .where((id) => _moduleVisibility[id] == true)
+        .where((id) => _moduleVisibility[id] == true && map.containsKey(id))
         .map((id) => map[id]!)
         .toList();
-    final profileModule = map['profile']!;
+    final profileModule = map['profile'];
     final withoutProfile = visibleModules.where((m) => m.id != 'profile').toList();
+    if (profileModule == null) return withoutProfile;
     return [...withoutProfile, profileModule];
   }
 
@@ -115,7 +116,7 @@ class SettingsService extends ChangeNotifier {
       final colorValue = prefs.getInt('theme_color');
       _themeColor = colorValue != null ? Color(colorValue) : _themeColors.first;
       final order = prefs.getStringList('module_order');
-      if (order != null && order.length == _defaultModules.length) {
+      if (order != null && _isValidModuleOrder(order)) {
         _moduleOrder = order;
       }
       final visibility = prefs.getStringList('module_visibility');
@@ -137,7 +138,7 @@ class SettingsService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('theme_mode', _themeMode.name);
-      await prefs.setInt('theme_color', _themeColor.value);
+      await prefs.setInt('theme_color', _themeColor.toARGB32());
       await prefs.setStringList('module_order', _moduleOrder);
       await prefs.setStringList('module_visibility', _moduleVisibility.entries.map((e) => '${e.key}:${e.value}').toList());
     } catch (_) {}
@@ -161,7 +162,7 @@ class SettingsService extends ChangeNotifier {
         final orderStr = response['module_order'] as String?;
         if (orderStr != null && orderStr.isNotEmpty) {
           final order = orderStr.split(',');
-          if (order.length == _defaultModules.length) {
+          if (_isValidModuleOrder(order)) {
             _moduleOrder = order;
           }
         }
@@ -188,7 +189,7 @@ class SettingsService extends ChangeNotifier {
     try {
       await _api.put('/user-settings', {
         'theme_mode': _themeMode.name,
-        'theme_color': '#${_themeColor.value.toRadixString(16).substring(2).toUpperCase()}',
+        'theme_color': '#${_themeColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
         'module_order': _moduleOrder.join(','),
         'module_visibility': _moduleVisibility.entries.map((e) => '${e.key}:${e.value}').join(','),
       });
@@ -212,12 +213,17 @@ class SettingsService extends ChangeNotifier {
   }
 
   Future<void> setModuleOrder(List<String> order) async {
-    if (order.length == _defaultModules.length) {
+    if (_isValidModuleOrder(order)) {
       _moduleOrder = order;
       await _persist();
       await syncToServer();
       notifyListeners();
     }
+  }
+
+  bool _isValidModuleOrder(List<String> order) {
+    final validIds = _defaultModules.map((m) => m.id).toSet();
+    return order.length == validIds.length && order.every(validIds.contains);
   }
 
   Future<void> setModuleVisibility(String moduleId, bool visible) async {

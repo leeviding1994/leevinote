@@ -45,6 +45,9 @@ dependencies:
   path_provider: ^2.1.1
   file_picker: ^8.0.0
 
+  # Fonts
+  google_fonts: ^6.1.0
+
   # Navigation
   go_router: ^13.0.1
   lunar: ^1.7.8

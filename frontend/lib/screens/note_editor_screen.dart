@@ -8,12 +8,14 @@ import 'package:dart_quill_delta/dart_quill_delta.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:leevinote/design/app_theme.dart';
 import 'package:leevinote/models/note.dart';
 import 'package:leevinote/models/folder.dart';
 import 'package:leevinote/services/api_service.dart';
 import 'package:leevinote/services/local_note_service.dart';
 import 'package:leevinote/services/local_folder_service.dart';
 import 'package:leevinote/screens/image_embed_builder.dart';
+import 'package:leevinote/widgets/widgets.dart';
 
 class _MoreAction {
   final IconData icon;
@@ -43,8 +45,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Note? _currentNote;
   StreamSubscription? _quillSubscription;
   bool _showMoreToolbar = false;
-  String _originalTitle = '';
-  String _originalContent = '';
 
   @override
   void initState() {
@@ -52,19 +52,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _currentNote = widget.note;
 
     _title = widget.note?.title ?? '';
-    _originalTitle = _title;
     _selectedFolderId = widget.note?.folderId;
     _selectedLocalFolderId = widget.note?.localFolderId ?? widget.defaultLocalFolderId;
 
     if (widget.note?.content != null && widget.note!.content!.isNotEmpty) {
       final delta = Delta.fromJson(jsonDecode(widget.note!.content!) as List);
-      _originalContent = widget.note!.content!;
       _quillC = QuillController(
         document: Document.fromDelta(delta),
         selection: const TextSelection.collapsed(offset: 0),
       );
     } else {
-      _originalContent = '';
       _quillC = QuillController.basic();
     }
 
@@ -99,7 +96,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final content = jsonEncode(delta);
 
     final title = _title.trim().isEmpty ? '无标题' : _title.trim();
-    final hasChanged = title != _originalTitle || content != _originalContent;
 
     final existing = _currentNote;
     if (existing == null) {
@@ -116,12 +112,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       final updated = existing.copyWith(
         title: title,
         content: content,
-        folderId: () => _selectedFolderId ?? existing.folderId,
-        localFolderId: () => _selectedLocalFolderId ?? existing.localFolderId,
+        folderId: () => _selectedFolderId,
+        localFolderId: () => _selectedLocalFolderId,
         updatedAt: DateTime.now(),
-        syncStatus: hasChanged && existing.syncStatus == 'synced'
-            ? 'modified'
-            : existing.syncStatus,
+        syncStatus: existing.syncStatus == 'synced' ? 'modified' : existing.syncStatus,
       );
       await local.updateNote(updated);
       _currentNote = updated;
@@ -130,11 +124,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   void _close() {
     _saveTimer?.cancel();
-    if (mounted) {
-      _autoSave().then((_) {
-        if (mounted) Navigator.pop(context);
-      });
-    }
+    if (!mounted) return;
+
+    _autoSave().then((_) {
+      if (mounted) Navigator.pop(context);
+    }).catchError((e, st) {
+      debugPrint('保存失败: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败: $e')),
+        );
+        Navigator.pop(context);
+      }
+    });
   }
 
   Future<void> _pickAndInsertImage() async {
@@ -256,55 +258,55 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('选择样式', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-            for (final entry in [
-              ('文本', null),
-              ('一级标题', 1),
-              ('二级标题', 2),
-              ('三级标题', 3),
-            ])
-              ListTile(
-                minLeadingWidth: 24,
-                leading: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Center(
-                    child: Text(
-                      entry.$2 == null ? 'T' : 'H${entry.$2}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: entry.$2 == null ? 14 : (14 + (entry.$2! * 2)).toDouble(),
-                        color: Theme.of(context).colorScheme.primary,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('选择样式', style: AppTypography.h2Light()),
+              const SizedBox(height: AppSpacing.lg),
+              for (final entry in [
+                ('文本', null),
+                ('一级标题', 1),
+                ('二级标题', 2),
+                ('三级标题', 3),
+              ])
+                AppListTile(
+                  leading: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Center(
+                      child: Text(
+                        entry.$2 == null ? 'T' : 'H${entry.$2}',
+                        style: AppTypography.bodyMediumLight(
+                          color: Theme.of(context).colorScheme.primary,
+                        ).copyWith(
+                          fontSize: entry.$2 == null ? 14 : (14 + (entry.$2! * 2)).toDouble(),
+                        ),
                       ),
                     ),
                   ),
+                  title: entry.$1,
+                  trailing: currentValue == entry.$2
+                      ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                      : null,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    final sel = _quillC.selection;
+                    if (entry.$2 == null) {
+                      _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.header);
+                    } else if (entry.$2 == 1) {
+                      _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.h1);
+                    } else if (entry.$2 == 2) {
+                      _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.h2);
+                    } else if (entry.$2 == 3) {
+                      _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.h3);
+                    }
+                  },
                 ),
-                title: Text(entry.$1),
-                trailing: currentValue == entry.$2
-                    ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
-                    : null,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  final sel = _quillC.selection;
-                  if (entry.$2 == null) {
-                    _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.header);
-                  } else if (entry.$2 == 1) {
-                    _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.h1);
-                  } else if (entry.$2 == 2) {
-                    _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.h2);
-                  } else if (entry.$2 == 3) {
-                    _quillC.formatText(sel.baseOffset, sel.extentOffset - sel.baseOffset, Attribute.h3);
-                  }
-                },
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -314,30 +316,30 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final currentStyle = _quillC.getSelectionStyle();
     final currentColor = currentStyle.attributes['color']?.value;
     final colors = [
-      (Colors.black, '黑色'),
-      (Colors.red, '红色'),
-      (Colors.orange, '橙色'),
+      (AppColors.primaryText, '黑色'),
+      (AppColors.error, '红色'),
+      (AppColors.warning, '橙色'),
       (Colors.yellow.shade700, '黄色'),
-      (Colors.green, '绿色'),
-      (Colors.blue, '蓝色'),
-      (Colors.purple, '紫色'),
-      (Colors.grey, '灰色'),
+      (AppColors.success, '绿色'),
+      (AppColors.brand, '蓝色'),
+      (const Color(0xFF8B5CF6), '紫色'),
+      (AppColors.secondaryText, '灰色'),
     ];
 
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('选择颜色', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
+              Text('选择颜色', style: AppTypography.h2Light()),
+              const SizedBox(height: AppSpacing.lg),
               Wrap(
-                spacing: 12,
-                runSpacing: 12,
+                spacing: AppSpacing.md,
+                runSpacing: AppSpacing.md,
                 children: [
                   for (final c in colors)
                     GestureDetector(
@@ -350,16 +352,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                           ColorAttribute('#${c.$1.toARGB32().toRadixString(16).substring(2)}'),
                         );
                       },
-                      child: Container(
-                        width: 40,
-                        height: 40,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
                           color: c.$1,
                           shape: BoxShape.circle,
                           border: currentColor != null &&
                                   c.$1.toARGB32().toString() == currentColor.toString()
-                              ? Border.all(color: Colors.white, width: 3)
-                              : Border.all(color: Colors.grey.shade300, width: 1),
+                              ? Border.all(color: Theme.of(context).colorScheme.surface, width: 3)
+                              : Border.all(color: AppColors.border, width: 1),
+                          boxShadow: currentColor != null &&
+                                  c.$1.toARGB32().toString() == currentColor.toString()
+                              ? AppShadows.light
+                              : null,
                         ),
                         child: currentColor != null &&
                                 c.$1.toARGB32().toString() == currentColor.toString()
@@ -378,19 +385,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       );
                     },
                     child: Container(
-                      width: 40,
-                      height: 40,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.surface,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey.shade300, width: 1),
+                        border: Border.all(color: AppColors.border, width: 1),
                       ),
-                      child: const Icon(Icons.format_clear, color: Colors.grey, size: 20),
+                      child: const Icon(Icons.format_clear, color: AppColors.tertiaryText, size: 20),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
             ],
           ),
         ),
@@ -402,22 +409,46 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final textController = TextEditingController(text: _title);
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('修改标题'),
-        content: TextField(
-          controller: textController,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '标题'),
-          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, textController.text.trim()),
-            child: const Text('确定'),
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('修改标题', style: AppTypography.h2Light()),
+                const SizedBox(height: AppSpacing.lg),
+                AppInput(
+                  controller: textController,
+                  hintText: '标题',
+                  autofocus: true,
+                  onEditingComplete: () => Navigator.pop(ctx, textController.text.trim()),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton.secondary(
+                        label: '取消',
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: AppButton(
+                        label: '确定',
+                        onPressed: () => Navigator.pop(ctx, textController.text.trim()),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
     if (!mounted) return;
@@ -433,9 +464,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Future<void> _editCategory() async {
     final folderService = context.read<LocalFolderService>();
     await folderService.ensureLoaded();
+    if (!mounted) return;
 
     final expandedFolders = <String>{};
-
     final prevLocalFolderId = _selectedLocalFolderId;
 
     await showModalBottomSheet(
@@ -443,7 +474,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
-          // Resolve _selectedLocalFolderId from _selectedFolderId if needed
           if (_selectedLocalFolderId == null && _selectedFolderId != null) {
             final match = folderService.folders
                 .where((f) => f.id == _selectedFolderId)
@@ -468,17 +498,45 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             final nameC = TextEditingController();
             final name = await showDialog<String>(
               context: context,
-              builder: (dCtx) => AlertDialog(
-                title: Text('在"${parent.name}"下新建'),
-                content: TextField(
-                  controller: nameC,
-                  autofocus: true,
-                  decoration: const InputDecoration(hintText: '文件夹名称'),
+              builder: (dCtx) => Dialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('在"${parent.name}"下新建', style: AppTypography.h2Light()),
+                        const SizedBox(height: AppSpacing.lg),
+                        AppInput(
+                          controller: nameC,
+                          hintText: '文件夹名称',
+                          autofocus: true,
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: AppButton.secondary(
+                                label: '取消',
+                                onPressed: () => Navigator.pop(dCtx),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: AppButton(
+                                label: '确定',
+                                onPressed: () => Navigator.pop(dCtx, nameC.text.trim()),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
-                  TextButton(onPressed: () => Navigator.pop(dCtx, nameC.text.trim()), child: const Text('确定')),
-                ],
               ),
             );
             if (name != null && name.isNotEmpty) {
@@ -492,8 +550,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           }
 
           List<Widget> buildFolderTree(List<Folder> items, {int depth = 0}) {
-            final leftPadding = 16.0 + depth * 24.0;
+            final leftPadding = AppSpacing.pageHorizontal + depth * 24.0;
             return items.map((folder) {
+              if (folder.localId == _selectedLocalFolderId) {
+                // nop
+              }
               final children = childrenMap[folder.localId] ?? const <Folder>[];
               final hasChildren = children.isNotEmpty;
               final isExpanded = expandedFolders.contains(folder.localId);
@@ -513,7 +574,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   InkWell(
                     onTap: selectFolder,
                     child: Padding(
-                      padding: EdgeInsets.only(left: leftPadding, right: 8, top: 8, bottom: 8),
+                      padding: EdgeInsets.only(
+                        left: leftPadding,
+                        right: AppSpacing.pageHorizontal,
+                        top: AppSpacing.sm,
+                        bottom: AppSpacing.sm,
+                      ),
                       child: Row(
                         children: [
                           if (hasChildren)
@@ -528,30 +594,32 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                                 });
                               },
                               child: Padding(
-                                padding: const EdgeInsets.all(4),
+                                padding: const EdgeInsets.all(AppSpacing.xs),
                                 child: Icon(
                                   isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
                                   size: 20,
+                                  color: AppColors.secondaryText,
                                 ),
                               ),
                             )
                           else
                             const SizedBox(width: 28),
-                          const Icon(Icons.folder, size: 20),
-                          const SizedBox(width: 12),
+                          const Icon(Icons.folder_outlined, size: 20, color: AppColors.brand),
+                          const SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Text(
                               folder.name,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              style: AppTypography.bodyLight(
+                                color: isSelected ? Theme.of(context).colorScheme.primary : null,
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (isSelected)
                             Icon(Icons.check, size: 18, color: Theme.of(context).colorScheme.primary),
-                          IconButton(
-                            icon: const Icon(Icons.add, size: 18),
+                          AppIconButton(
+                            icon: Icons.add,
+                            iconSize: 18,
                             tooltip: '新建子文件夹',
                             onPressed: () => addSubFolder(folder),
                           ),
@@ -566,31 +634,29 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             }).toList();
           }
 
+          final newFolderC = TextEditingController();
+
           return Padding(
             padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              left: AppSpacing.pageHorizontal,
+              right: AppSpacing.pageHorizontal,
+              top: AppSpacing.xl,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xl,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('选择文件夹',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
+                Text('选择文件夹', style: AppTypography.h2Light()),
+                const SizedBox(height: AppSpacing.lg),
                 Flexible(
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        ListTile(
-                          dense: true,
+                        AppListTile(
                           leading: const Icon(Icons.folder_off, size: 20),
-                          title: const Text('无文件夹'),
-                          selected: _selectedLocalFolderId == null,
+                          title: '无文件夹',
                           onTap: () {
                             setState(() {
                               _selectedFolderId = null;
@@ -598,41 +664,37 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                             });
                             Navigator.pop(ctx);
                           },
+                          trailing: _selectedLocalFolderId == null
+                              ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                              : null,
                         ),
                         if (rootFolders.isNotEmpty) ...[
-                          const Divider(),
+                          const Divider(height: 1),
                           ...buildFolderTree(rootFolders),
                         ],
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          hintText: '新建文件夹名称',
-                          border: OutlineInputBorder(),
-                          prefixIcon:
-                              Icon(Icons.create_new_folder_outlined, size: 20),
-                        ),
-                        onSubmitted: (v) async {
-                          if (v.trim().isNotEmpty) {
-                            await folderService
-                                .addFolder(Folder(name: v.trim()));
-                            setSheetState(() {});
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('确定'),
-                    ),
-                  ],
+                const SizedBox(height: AppSpacing.lg),
+                AppInput(
+                  controller: newFolderC,
+                  hintText: '新建文件夹名称',
+                  prefixIcon: const Icon(Icons.create_new_folder_outlined, size: 20),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (value) async {
+                    final v = value.trim();
+                    if (v.isNotEmpty) {
+                      await folderService.addFolder(Folder(name: v));
+                      newFolderC.clear();
+                      setSheetState(() {});
+                    }
+                  },
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                AppButton(
+                  label: '确定',
+                  onPressed: () => Navigator.pop(ctx),
                 ),
               ],
             ),
@@ -654,31 +716,36 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         ? folders.where((f) => f.localId == _selectedLocalFolderId).firstOrNull
         : null;
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: _close,
-        ),
-        title: InkWell(
-          onTap: _editTitle,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(title, style: const TextStyle(fontSize: 16)),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _close();
+      },
+      child: Scaffold(
+        appBar: AppAppBar(
+          leading: AppIconButton(
+            icon: Icons.close,
+            onPressed: _close,
           ),
-        ),
-        centerTitle: false,
-        actions: [
-          TextButton(
-            onPressed: _editCategory,
-            child: Text(
-              selectedFolder != null ? selectedFolder.name : '文件夹',
-              style: const TextStyle(fontSize: 14),
+          titleWidget: InkWell(
+            onTap: _editTitle,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(title, style: AppTypography.bodyMediumLight()),
             ),
           ),
-        ],
-      ),
-      resizeToAvoidBottomInset: true,
+          actions: [
+            AppButton.secondary(
+              label: selectedFolder != null ? selectedFolder.name : '文件夹',
+              onPressed: _editCategory,
+              width: null,
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+          ],
+        ),
+        resizeToAvoidBottomInset: true,
       body: Column(
         children: [
           Expanded(
@@ -688,7 +755,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               scrollController: ScrollController(),
               config: QuillEditorConfig(
                 placeholder: '开始写点什么...',
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
                 embedBuilders: [NoteImageEmbedBuilder()],
                 autoFocus: true,
                 expands: true,
@@ -700,7 +767,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           if (_showMoreToolbar)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.surfaceSecondaryDark
+                  : AppColors.surfaceSecondary,
               child: Wrap(
                 spacing: 2,
                 runSpacing: 2,
@@ -784,6 +853,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
