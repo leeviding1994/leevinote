@@ -6,7 +6,6 @@ import 'package:leevinote/models/transaction.dart';
 import 'package:leevinote/models/transaction_category.dart';
 import 'package:leevinote/services/local_transaction_service.dart';
 import 'package:leevinote/services/local_transaction_category_service.dart';
-import 'package:leevinote/services/transaction_service.dart';
 import 'package:leevinote/widgets/widgets.dart';
 import 'transaction_category_manager_screen.dart';
 
@@ -32,7 +31,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     final t = widget.transaction;
     _isExpense = t?.type != 'income';
     _transactionDate = t?.transactionDate ?? DateTime.now();
-    _amountC.text = t != null ? t.amount.toStringAsFixed(t.amount.truncateToDouble() == t.amount ? 0 : 2) : '';
+    _amountC.text = t != null ? t.amount.toStringAsFixed(2) : '';
     _noteC.text = t?.note ?? '';
     _selectedLocalCategoryId = t?.localCategoryId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -65,20 +64,6 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     if (picked != null) {
       setState(() => _transactionDate = picked);
     }
-  }
-
-  Future<void> _delete() async {
-    final service = context.read<TransactionService>();
-    final confirmed = await AppDialog.confirm(
-      context: context,
-      title: '删除记录',
-      content: '确定要删除这条记录吗？删除后无法恢复。',
-      confirmLabel: '删除',
-      destructive: true,
-    );
-    if (confirmed != true) return;
-    await service.deleteTransaction(widget.transaction!.localId);
-    if (mounted) Navigator.pop(context, true);
   }
 
   Future<void> _save() async {
@@ -137,24 +122,27 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         .where((c) => c.type == (_isExpense ? 'expense' : 'income'))
         .toList();
 
+    final typeColor = _isExpense ? AppColors.error : AppColors.success;
+    final amountStyle = AppTypography.h1Light(color: typeColor).copyWith(fontSize: 44);
+
     return AppScaffold.noPadding(
       appBar: AppAppBar(
-        title: null,
+        leading: AppIconButton(
+          icon: Icons.close,
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: '记账',
+        centerTitle: true,
         actions: [
-          AppButton.secondary(
+          AppButton(
             label: '保存',
             width: null,
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            height: 28,
+            borderRadius: AppRadius.xs,
+            padding: const EdgeInsets.symmetric(horizontal: 32),
             onPressed: _save,
           ),
           const SizedBox(width: AppSpacing.sm),
-          if (widget.transaction != null)
-            AppIconButton(
-              icon: Icons.delete_outline,
-              tooltip: '删除',
-              onPressed: _delete,
-            ),
         ],
       ),
       body: SingleChildScrollView(
@@ -165,129 +153,247 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                padding: const EdgeInsets.all(AppSpacing.xs),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceSecondary,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildTypeChip(label: '支出', isExpense: true),
-                    _buildTypeChip(label: '收入', isExpense: false),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            AppInput(
-              controller: _amountC,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              textAlign: TextAlign.center,
-              style: AppTypography.h1Light(),
-              hintText: '0.00',
-              prefixIcon: Padding(
-                padding: const EdgeInsets.only(left: AppSpacing.md),
-                child: Text('¥', style: AppTypography.h2Light(color: AppColors.secondaryText)),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.component),
-            AppCard(
-              shadows: const [],
-              onTap: _pickDate,
-              child: Row(
-                children: [
-                  const Icon(Icons.calendar_today, color: AppColors.secondaryText),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(child: Text('日期', style: AppTypography.bodyLight())),
-                  Text(
-                    DateFormat('yyyy年MM月dd日', 'zh_CN').format(_transactionDate),
-                    style: AppTypography.bodyMediumLight(),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  const Icon(Icons.chevron_right, color: AppColors.tertiaryText),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            Text('选择分类', style: AppTypography.h3Light()),
-            const SizedBox(height: AppSpacing.lg),
-            Wrap(
-              spacing: AppSpacing.md,
-              runSpacing: AppSpacing.md,
+            // 金额输入区
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
-                ...categories.map((c) => _buildCategoryChip(c)),
-                AppChip(
-                  label: '管理分类',
-                  icon: Icons.add,
-                  onSelected: (_) => Navigator.push(
-                    context,
-                    AppPageRoute(builder: (_) => const TransactionCategoryManagerScreen()),
+                Text('¥', style: amountStyle),
+                IntrinsicWidth(
+                  child: TextField(
+                    controller: _amountC,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    textAlign: TextAlign.center,
+                    style: amountStyle,
+                    decoration: InputDecoration(
+                      hintText: '0.00',
+                      hintStyle: amountStyle.copyWith(
+                        color: typeColor.withValues(alpha: 0.35),
+                      ),
+                      border: InputBorder.none,
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surface,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: AppSpacing.xxl),
-            AppInput(
-              controller: _noteC,
-              hintText: '添加备注（可选）',
-              prefixIcon: const Icon(Icons.notes_outlined, size: 20),
-              maxLines: 3,
+            // 类型
+            _buildFormCard(
+              icon: Icons.compare_arrows,
+              label: '类型',
+              trailing: _buildTypeToggle(),
             ),
+            const SizedBox(height: AppSpacing.component),
+            // 日期
+            _buildFormCard(
+              icon: Icons.calendar_today_outlined,
+              label: '日期',
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('yyyy年MM月dd日', 'zh_CN').format(_transactionDate),
+                    style: AppTypography.bodyLight(color: AppColors.secondaryText),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  const Icon(Icons.chevron_right, color: AppColors.tertiaryText, size: 18),
+                ],
+              ),
+              onTap: _pickDate,
+            ),
+            const SizedBox(height: AppSpacing.component),
+            // 备注
+            _buildFormCard(
+              icon: Icons.edit_note_outlined,
+              label: '备注',
+              trailing: Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: AppSpacing.md),
+                  child: TextField(
+                    controller: _noteC,
+                    textAlign: TextAlign.right,
+                    style: AppTypography.bodyLight(),
+                    decoration: InputDecoration(
+                      hintText: '点击输入备注...',
+                      hintStyle: AppTypography.bodyLight(color: AppColors.tertiaryText),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.module),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('选择分类', style: AppTypography.h3Light()),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    AppPageRoute(builder: (_) => const TransactionCategoryManagerScreen()),
+                  ),
+                  child: Text(
+                    '管理',
+                    style: AppTypography.bodyMediumLight(color: AppColors.brand),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            if (categories.isEmpty)
+              const AppEmptyState(
+                icon: Icons.category_outlined,
+                title: '暂无分类',
+                subtitle: '点击管理分类添加',
+              )
+            else
+              _buildCategoryGrid(categories),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTypeChip({required String label, required bool isExpense}) {
-    final selected = _isExpense == isExpense;
-    final color = isExpense ? AppColors.error : AppColors.success;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      decoration: BoxDecoration(
-        color: selected ? color : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
+  Widget _buildFormCard({
+    required IconData icon,
+    required String label,
+    required Widget trailing,
+    VoidCallback? onTap,
+  }) {
+    final child = AppCard(
+      shadows: const [],
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
       ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          onTap: () => setState(() {
-            _isExpense = isExpense;
-            _selectedLocalCategoryId = null;
-          }),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.md,
-            ),
-            child: Text(
-              label,
-              style: AppTypography.bodyMediumLight(
-                color: selected ? Colors.white : color,
-              ),
-            ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: AppColors.secondaryText, size: 20),
+              const SizedBox(width: AppSpacing.md),
+              Text(label, style: AppTypography.bodyLight()),
+            ],
+          ),
+          trailing,
+        ],
+      ),
+    );
+
+    if (onTap == null) return child;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.xl),
+      child: child,
+    );
+  }
+
+  Widget _buildTypeToggle() {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSecondary,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildTypeChip(label: '支出', expense: true),
+          _buildTypeChip(label: '收入', expense: false),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypeChip({required String label, required bool expense}) {
+    final selected = _isExpense == expense;
+    final color = expense ? AppColors.error : AppColors.success;
+
+    return GestureDetector(
+      onTap: () => setState(() {
+        _isExpense = expense;
+        _selectedLocalCategoryId = null;
+      }),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.md - 2),
+        ),
+        child: Text(
+          label,
+          style: AppTypography.bodyMediumLight(
+            color: selected ? Colors.white : AppColors.secondaryText,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCategoryChip(TransactionCategory category) {
+  Widget _buildCategoryGrid(List<TransactionCategory> categories) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        mainAxisSpacing: AppSpacing.lg,
+        crossAxisSpacing: AppSpacing.md,
+        childAspectRatio: 0.85,
+      ),
+      itemCount: categories.length,
+      itemBuilder: (context, index) {
+        final category = categories[index];
+        return _buildCategoryItem(category);
+      },
+    );
+  }
+
+  Widget _buildCategoryItem(TransactionCategory category) {
     final selected = _selectedLocalCategoryId == category.localId;
     final color = _parseColor(category.color);
 
-    return AppChip(
-      label: category.name,
-      icon: _parseIcon(category.icon),
-      selected: selected,
-      selectedColor: color,
-      onSelected: (_) => setState(() => _selectedLocalCategoryId = category.localId),
+    return GestureDetector(
+      onTap: () => setState(() => _selectedLocalCategoryId = category.localId),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: selected ? color : color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _parseIcon(category.icon),
+              color: selected ? Colors.white : color,
+              size: 24,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            category.name,
+            style: AppTypography.smallLight(
+              color: selected ? color : AppColors.secondaryText,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 

@@ -219,99 +219,128 @@ class _TransactionCategoryManagerScreenState
 
     return AppScaffold.noPadding(
       appBar: AppAppBar(
-        title: '分类管理',
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.pageHorizontal,
-              0,
-              AppSpacing.pageHorizontal,
-              AppSpacing.md,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildTypeChip(label: '支出分类', isExpense: true),
-                const SizedBox(width: AppSpacing.md),
-                _buildTypeChip(label: '收入分类', isExpense: false),
-              ],
-            ),
-          ),
+        leading: AppIconButton(
+          icon: Icons.arrow_back,
+          onPressed: () => Navigator.pop(context),
         ),
+        title: '分类管理',
+        centerTitle: true,
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(AppSpacing.pageHorizontal),
-        itemCount: categories.length,
-        itemBuilder: (context, index) {
-          final c = categories[index];
-          final color = _parseColor(c.color);
-          return AnimatedListItem(
-            index: index,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.listItemGap),
-              child: AppCard(
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                      ),
-                      child: Icon(_parseIcon(c.icon), color: color),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(child: Text(c.name, style: AppTypography.bodyLight())),
-                    AppIconButton(
-                      icon: Icons.edit,
-                      onPressed: () => _addOrEditCategory(c),
-                    ),
-                    AppIconButton(
-                      icon: Icons.delete_outline,
-                      onPressed: () => _deleteCategory(c),
-                    ),
-                  ],
-                ),
-              ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.pageHorizontal,
+              vertical: AppSpacing.md,
             ),
-          );
-        },
+            child: _buildTypeToggle(),
+          ),
+          Expanded(
+            child: categories.isEmpty
+                ? const AppEmptyState(
+                    icon: Icons.category_outlined,
+                    title: '暂无分类',
+                    subtitle: '点击右下角按钮添加',
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(AppSpacing.pageHorizontal),
+                    itemCount: categories.length,
+                    itemBuilder: (context, index) {
+                      final c = categories[index];
+                      final color = _parseColor(c.color);
+                      return AnimatedListItem(
+                        index: index,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.listItemGap),
+                          child: AppCard(
+                            shadows: const [],
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.lg,
+                              vertical: AppSpacing.sm,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                                  ),
+                                  child: Icon(_parseIcon(c.icon), color: color, size: 22),
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(child: Text(c.name, style: AppTypography.bodyMediumLight())),
+                                AppIconButton(
+                                  icon: Icons.edit_outlined,
+                                  color: AppColors.tertiaryText,
+                                  onPressed: () => _addOrEditCategory(c),
+                                ),
+                                AppIconButton(
+                                  icon: Icons.delete_outline,
+                                  color: AppColors.tertiaryText,
+                                  onPressed: () => _deleteCategory(c),
+                                ),
+                                AppIconButton(
+                                  icon: Icons.drag_handle,
+                                  color: AppColors.tertiaryText,
+                                  onPressed: () {},
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
       floatingActionButton: AppFAB(
         onPressed: () => _addOrEditCategory(null),
         icon: Icons.add,
+        label: '新增分类',
+      ),
+    );
+  }
+
+  Widget _buildTypeToggle() {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSecondary,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildTypeChip(label: '支出', isExpense: true),
+          ),
+          Expanded(
+            child: _buildTypeChip(label: '收入', isExpense: false),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildTypeChip({required String label, required bool isExpense}) {
     final selected = _isExpenseType == isExpense;
-    final color = isExpense ? AppColors.error : AppColors.success;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      decoration: BoxDecoration(
-        color: selected ? color : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          onTap: () => setState(() => _isExpenseType = isExpense),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.md,
-            ),
-            child: Text(
-              label,
-              style: AppTypography.bodyMediumLight(
-                color: selected ? Colors.white : color,
-              ),
+    return GestureDetector(
+      onTap: () => setState(() => _isExpenseType = isExpense),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.brand : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.lg - 2),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: AppTypography.bodyMediumLight(
+              color: selected ? Colors.white : AppColors.secondaryText,
             ),
           ),
         ),

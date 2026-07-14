@@ -12,6 +12,7 @@ class AppButton extends StatelessWidget {
   final IconData? icon;
   final double? height;
   final double? width;
+  final double? borderRadius;
   final EdgeInsets? padding;
   final bool secondary;
 
@@ -24,6 +25,7 @@ class AppButton extends StatelessWidget {
     this.icon,
     this.height,
     this.width = double.infinity,
+    this.borderRadius,
     this.padding,
     this.secondary = false,
   });
@@ -37,6 +39,7 @@ class AppButton extends StatelessWidget {
     this.icon,
     this.height,
     this.width = double.infinity,
+    this.borderRadius,
     this.padding,
   }) : secondary = true;
 
@@ -54,20 +57,22 @@ class AppButton extends StatelessWidget {
             : theme.colorScheme.primaryContainer)
         : (destructive ? AppColors.error : theme.colorScheme.primary);
 
+    final radius = BorderRadius.circular(borderRadius ?? AppRadius.md);
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       width: width,
       height: height ?? 52,
       decoration: BoxDecoration(
         color: onPressed == null || isLoading ? backgroundColor.withValues(alpha: 0.5) : backgroundColor,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: radius,
         boxShadow: secondary || onPressed == null || isLoading ? null : AppShadows.light,
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: radius,
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: radius,
           onTap: isLoading ? null : onPressed,
           child: Center(
             child: isLoading

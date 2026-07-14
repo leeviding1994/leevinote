@@ -7,6 +7,7 @@ import 'package:leevinote/design/app_theme.dart';
 class AppFAB extends StatelessWidget {
   final VoidCallback? onPressed;
   final IconData icon;
+  final String? label;
   final String? tooltip;
   final Color? backgroundColor;
   final Color? foregroundColor;
@@ -16,6 +17,7 @@ class AppFAB extends StatelessWidget {
     super.key,
     required this.onPressed,
     required this.icon,
+    this.label,
     this.tooltip,
     this.backgroundColor,
     this.foregroundColor,
@@ -25,25 +27,42 @@ class AppFAB extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bg = backgroundColor ?? theme.colorScheme.primary;
+    final fg = foregroundColor ?? theme.colorScheme.onPrimary;
+    final hasLabel = label != null && label!.isNotEmpty;
 
     final fab = Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: AppShadows.medium,
       ),
       child: Material(
-        color: backgroundColor ?? theme.colorScheme.primary,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        color: bg,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           onTap: onPressed,
           child: SizedBox(
-            width: 56,
-            height: 56,
-            child: Icon(
-              icon,
-              color: foregroundColor ?? theme.colorScheme.onPrimary,
-              size: 24,
+            width: hasLabel ? null : 56,
+            height: 48,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: hasLabel ? AppSpacing.lg : 0,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: fg, size: 20),
+                  if (hasLabel) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      label!,
+                      style: AppTypography.bodyMediumLight(color: fg),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ),
