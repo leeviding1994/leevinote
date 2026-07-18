@@ -12,6 +12,7 @@ class DatabaseHelper {
 
   static Database? _db;
   bool _migrated = false;
+  bool _noteSearchIndexEnabled = false;
 
   Future<Database> get database async {
     _db ??= await _initDatabase();
@@ -24,9 +25,10 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: (db, version) async {
         await _createTables(db);
+        await _createTransactionTables(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion == 1) {
@@ -40,8 +42,15 @@ class DatabaseHelper {
           // v2 -> v3: add bookkeeping module tables
           await _createTransactionTables(db);
         }
+        if (oldVersion <= 3) {
+          // v3 -> v4: add FTS index for local note search
+          await _createNoteSearchIndex(db);
+          await _rebuildNoteSearchIndex(db);
+        }
       },
       onOpen: (db) async {
+        await _createTransactionTables(db);
+        await _createNoteSearchIndex(db);
         if (!_migrated) {
           await _migrateFromSharedPreferences(db);
           _migrated = true;
@@ -79,6 +88,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_notes_local_folder ON notes(local_folder_id)
     ''');
+    await _createNoteSearchIndex(db);
 
     await db.execute('''
       CREATE TABLE IF NOT EXISTS folders (
@@ -100,6 +110,59 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_folders_is_deleted ON folders(is_deleted)
     ''');
+  }
+
+  Future<void> _createNoteSearchIndex(Database db) async {
+    try {
+      await db.execute('''
+        CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+          local_id UNINDEXED,
+          title,
+          content
+        )
+      ''');
+      _noteSearchIndexEnabled = true;
+    } catch (_) {
+      try {
+        await db.execute('''
+          CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts4(
+            local_id,
+            title,
+            content,
+            notindexed=local_id
+          )
+        ''');
+        _noteSearchIndexEnabled = true;
+      } catch (_) {
+        _noteSearchIndexEnabled = false;
+      }
+    }
+  }
+
+  Future<void> _rebuildNoteSearchIndex(Database db) async {
+    if (!_noteSearchIndexEnabled) return;
+    await db.delete('notes_fts');
+    await db.execute('''
+      INSERT INTO notes_fts(local_id, title, content)
+      SELECT local_id, title, COALESCE(content, '')
+      FROM notes
+      WHERE is_deleted = 0
+    ''');
+  }
+
+  Future<void> _upsertNoteSearchIndex(Database db, Note note) async {
+    if (!_noteSearchIndexEnabled) return;
+    await db.delete('notes_fts', where: 'local_id = ?', whereArgs: [note.localId]);
+    await db.insert('notes_fts', {
+      'local_id': note.localId,
+      'title': note.title,
+      'content': note.content ?? '',
+    });
+  }
+
+  Future<void> _deleteNoteSearchIndex(Database db, String localId) async {
+    if (!_noteSearchIndexEnabled) return;
+    await db.delete('notes_fts', where: 'local_id = ?', whereArgs: [localId]);
   }
 
   Future<void> _migrateFromSharedPreferences(Database db) async {
@@ -171,12 +234,39 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> searchNotes(String query) async {
     final db = await database;
-    return await db.query(
-      'notes',
-      where: 'is_deleted = ? AND (title LIKE ? OR content LIKE ?)',
-      whereArgs: [0, '%$query%', '%$query%'],
-      orderBy: 'created_at DESC',
-    );
+    if (!_noteSearchIndexEnabled) {
+      return _searchNotesWithLike(db, query);
+    }
+    try {
+      return await db.rawQuery('''
+        SELECT notes.*
+        FROM notes_fts
+        JOIN notes ON notes.local_id = notes_fts.local_id
+        WHERE notes.is_deleted = 0 AND notes_fts MATCH ?
+        ORDER BY notes.created_at DESC
+      ''', [_buildFtsQuery(query)]);
+    } catch (_) {
+      return _searchNotesWithLike(db, query);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _searchNotesWithLike(Database db, String query) async {
+    return await db.rawQuery('''
+      SELECT *
+      FROM notes
+      WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?)
+      ORDER BY created_at DESC
+    ''', ['%$query%', '%$query%']);
+  }
+
+  String _buildFtsQuery(String query) {
+    final terms = query
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((term) => term.isNotEmpty)
+        .map((term) => '"${term.replaceAll('"', '""')}"*')
+        .toList();
+    return terms.isEmpty ? '""' : terms.join(' AND ');
   }
 
   Future<List<Map<String, dynamic>>> getNotesByFolder(String? localFolderId) async {
@@ -228,6 +318,7 @@ class DatabaseHelper {
       data['id'] = note.id;
     }
     await db.insert('notes', data, conflictAlgorithm: ConflictAlgorithm.replace);
+    await _upsertNoteSearchIndex(db, note);
   }
 
   Future<void> updateNote(Note note) async {
@@ -250,6 +341,7 @@ class DatabaseHelper {
       where: 'local_id = ?',
       whereArgs: [note.localId],
     );
+    await _upsertNoteSearchIndex(db, note);
   }
 
   Future<void> deleteNote(String localId) async {
@@ -260,6 +352,7 @@ class DatabaseHelper {
       where: 'local_id = ?',
       whereArgs: [localId],
     );
+    await _deleteNoteSearchIndex(db, localId);
   }
 
   Future<void> forceDeleteNote(String localId) async {
@@ -269,6 +362,7 @@ class DatabaseHelper {
       where: 'local_id = ?',
       whereArgs: [localId],
     );
+    await _deleteNoteSearchIndex(db, localId);
   }
 
   // Folders CRUD
@@ -564,6 +658,7 @@ class DatabaseHelper {
   Future<void> clearAll() async {
     final db = await database;
     await db.delete('notes');
+    await db.delete('notes_fts');
     await db.delete('folders');
     await db.delete('transactions');
     await db.delete('transaction_categories');

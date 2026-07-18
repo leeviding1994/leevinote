@@ -70,7 +70,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     await categoryService.ensureLoaded();
     if (!mounted) return;
 
-    var transactions = List<Transaction>.from(localService.transactions)
+    var transactions = localService.transactions
+        .where((t) => t.syncStatus != 'deleted')
+        .toList()
       ..sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
 
     if (_filterType != null) {
@@ -204,15 +206,17 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
     setState(() => _loading = true);
     try {
-      await TransactionCategoryService(api, localCat).syncCategories();
-      await TransactionService(api, localTx, categoryLocal: localCat).syncTransactions();
+      final categoriesSynced = await TransactionCategoryService(api, localCat).syncCategories();
+      final transactionsSynced = categoriesSynced
+          ? await TransactionService(api, localTx, categoryLocal: localCat).syncTransactions()
+          : false;
       await _refreshData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('同步完成'),
+          SnackBar(
+            content: Text(categoriesSynced && transactionsSynced ? '同步完成' : '同步失败，请检查网络或登录状态'),
             behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
+            margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
           ),
         );
       }

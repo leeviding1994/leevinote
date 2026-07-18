@@ -72,7 +72,40 @@ class ApiService {
   Future<List<dynamic>> getList(String path) async {
     try {
       final response = await _dio.get(path);
-      return response.data;
+      final data = response.data;
+      if (data is List) return data;
+      if (data is Map && data['content'] is List) {
+        final items = List<dynamic>.from(data['content'] as List);
+        final totalPages = (data['totalPages'] ?? data['total_pages']) as int?;
+        final currentPage = data['number'] as int? ?? 0;
+        if (totalPages == null || currentPage >= totalPages - 1) {
+          return items;
+        }
+
+        final separator = path.contains('?') ? '&' : '?';
+        for (var page = currentPage + 1; page < totalPages; page++) {
+          final pageResponse = await _dio.get('$path${separator}page=$page');
+          final pageData = pageResponse.data;
+          if (pageData is Map && pageData['content'] is List) {
+            items.addAll(pageData['content'] as List);
+          }
+        }
+        return items;
+      }
+      throw 'Unexpected list response';
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> getPage(String path, {int page = 0, int size = 50}) async {
+    try {
+      final separator = path.contains('?') ? '&' : '?';
+      final response = await _dio.get('$path${separator}page=$page&size=$size');
+      final data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      throw 'Unexpected page response';
     } on DioException catch (e) {
       throw _handleError(e);
     }

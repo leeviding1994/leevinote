@@ -32,7 +32,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final auth = context.watch<AuthService>();
 
     return AppScaffold.noPadding(
-      appBar: const AppAppBar(title: '我的'),
       body: auth.isAuthenticated
           ? _buildAuthenticatedProfile(auth)
           : _buildUnauthenticatedProfile(),
@@ -258,9 +257,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       content: '确定要退出登录吗？',
       confirmLabel: '退出',
       destructive: true,
-    ).then((confirmed) {
+    ).then((confirmed) async {
       if (confirmed == true && mounted) {
-        context.read<AuthService>().logout();
+        await context.read<AuthService>().logout();
+        if (!mounted) return;
+        setState(() => _isEditing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已退出登录')),
+        );
       }
     });
   }

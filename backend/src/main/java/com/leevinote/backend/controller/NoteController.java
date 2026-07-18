@@ -5,10 +5,13 @@ import com.leevinote.backend.entity.User;
 import com.leevinote.backend.repository.UserRepository;
 import com.leevinote.backend.service.NoteService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -19,9 +22,10 @@ public class NoteController {
     private final UserRepository userRepository;
 
     @GetMapping
-    public ResponseEntity<List<Note>> getNotes() {
+    public ResponseEntity<Page<Note>> getNotes(
+            @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Long userId = getCurrentUserId();
-        return ResponseEntity.ok(noteService.getNotesByUser(userId));
+        return ResponseEntity.ok(noteService.getNotesByUser(userId, pageable));
     }
 
     @PostMapping
@@ -34,12 +38,12 @@ public class NoteController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Note> updateNote(@PathVariable Long id, @RequestBody Note note) {
-        return ResponseEntity.ok(noteService.updateNote(id, note));
+        return ResponseEntity.ok(noteService.updateNote(getCurrentUserId(), id, note));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteNote(@PathVariable Long id) {
-        noteService.deleteNote(id);
+        noteService.deleteNote(getCurrentUserId(), id);
         return ResponseEntity.ok(Map.of("message", "Note deleted"));
     }
 

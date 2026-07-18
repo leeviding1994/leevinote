@@ -12,5 +12,5 @@ public interface TransactionCategoryRepository extends JpaRepository<Transaction
 
     List<TransactionCategory> findByUserIdAndIsDeletedFalseOrderByTypeAscCreatedAtAsc(Long userId);
 
-    Optional<TransactionCategory> findByIdAndUserId(Long id, Long userId);
+    Optional<TransactionCategory> findByIdAndUserIdAndIsDeletedFalse(Long id, Long userId);
 }

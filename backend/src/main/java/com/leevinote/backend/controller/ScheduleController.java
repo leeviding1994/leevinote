@@ -4,9 +4,12 @@ import com.leevinote.backend.entity.Schedule;
 import com.leevinote.backend.security.SecurityContextUtil;
 import com.leevinote.backend.service.ScheduleService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -17,10 +20,11 @@ public class ScheduleController {
     private final ScheduleService scheduleService;
 
     @GetMapping
-    public ResponseEntity<List<Schedule>> getSchedules() {
+    public ResponseEntity<Page<Schedule>> getSchedules(
+            @PageableDefault(size = 50, sort = "startTime", direction = Sort.Direction.ASC) Pageable pageable) {
         Long userId = SecurityContextUtil.getCurrentUserId();
         if (userId == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(scheduleService.getSchedulesByUser(userId));
+        return ResponseEntity.ok(scheduleService.getSchedulesByUser(userId, pageable));
     }
 
     @PostMapping

@@ -13,6 +13,7 @@ class AuthService extends ChangeNotifier {
   String? _avatarBase64;
   String? _email;
   VoidCallback? _onLogin;
+  int _authVersion = 0;
 
   bool get isAuthenticated => _isAuthenticated;
   String? get username => _username;
@@ -70,14 +71,17 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> _checkAuth() async {
+    final version = _authVersion;
     try {
       final token = await read('jwt_token');
+      if (version != _authVersion) return;
       if (token != null) {
         _isAuthenticated = true;
         _username = await read('username');
         _nickname = await read('nickname');
         _email = await read('email');
         _avatarBase64 = await read('avatar_base64');
+        if (version != _authVersion) return;
         notifyListeners();
         _onLogin?.call();
       }
@@ -93,6 +97,7 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> login(String username, String password) async {
+    _authVersion++;
     final response = await _api.post('/auth/login', {
       'username': username,
       'password': password,
@@ -107,17 +112,32 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await delete('jwt_token');
-    await delete('username');
-    await delete('nickname');
-    await delete('email');
-    await delete('avatar_base64');
+    _authVersion++;
     _isAuthenticated = false;
     _username = null;
     _nickname = null;
     _email = null;
     _avatarBase64 = null;
     notifyListeners();
+
+    await Future.wait([
+      _deleteFromAllStores('jwt_token'),
+      _deleteFromAllStores('username'),
+      _deleteFromAllStores('nickname'),
+      _deleteFromAllStores('email'),
+      _deleteFromAllStores('avatar_base64'),
+    ]);
+  }
+
+  Future<void> _deleteFromAllStores(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(key);
+    } catch (_) {}
+    try {
+      const storage = FlutterSecureStorage();
+      await storage.delete(key: key);
+    } catch (_) {}
   }
 
   Future<void> updateProfile({String? nickname, String? email, String? avatarBase64}) async {

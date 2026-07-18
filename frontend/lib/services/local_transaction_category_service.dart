@@ -124,13 +124,20 @@ class LocalTransactionCategoryService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addOrUpdateFromRemote(TransactionCategory remote) async {
+  Future<void> addOrUpdateFromRemote(TransactionCategory remote, {bool force = false}) async {
     await ensureLoaded();
-    if (remote.id != null && _deletedCategoryIds.contains(remote.id.toString())) {
+    if (!force && remote.id != null && _deletedCategoryIds.contains(remote.id.toString())) {
       return;
     }
-    if (_deletedCategoryIds.contains(remote.localId)) {
+    if (!force && _deletedCategoryIds.contains(remote.localId)) {
       return;
+    }
+    if (force) {
+      if (remote.id != null) {
+        _deletedCategoryIds.remove(remote.id.toString());
+      }
+      _deletedCategoryIds.remove(remote.localId);
+      await _persistDeletedIds();
     }
 
     final i = _categories.indexWhere((c) => c.id != null && c.id == remote.id);

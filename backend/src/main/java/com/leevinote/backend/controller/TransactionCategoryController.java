@@ -39,10 +39,7 @@ public class TransactionCategoryController {
     @PutMapping("/{id}")
     public ResponseEntity<TransactionCategory> updateCategory(@PathVariable Long id, @RequestBody TransactionCategory category) {
         Long userId = getCurrentUserId();
-        User user = new User();
-        user.setId(userId);
-        category.setUser(user);
-        return ResponseEntity.ok(categoryService.updateCategory(id, category));
+        return ResponseEntity.ok(categoryService.updateCategory(userId, id, category));
     }
 
     @DeleteMapping("/{id}")

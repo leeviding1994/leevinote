@@ -2,11 +2,12 @@ import 'package:flutter/foundation.dart';
 
 class ApiConstants {
   static String get baseUrl {
-    if (kIsWeb) return 'http://localhost:8080/api';
+    if (kIsWeb) return 'http://backend.leevinote.leeviding.cn/api';
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://localhost:8080/api';
+      return 'http://backend.leevinote.leeviding.cn/api';
     }
-    return 'http://localhost:8080/api';
+    // return 'http://localhost:8080/api';
+    return 'http://backend.leevinote.leeviding.cn/api';
   }
 
   static const String signup = '/auth/signup';

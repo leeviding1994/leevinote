@@ -20,7 +20,7 @@ class TransactionService extends ChangeNotifier {
           .map((e) => Transaction.fromJson(e as Map<String, dynamic>).copyWith(syncStatus: 'synced'))
           .toList();
       for (final rt in remoteTransactions) {
-        await _local.addOrUpdateFromRemote(rt);
+        await _local.addOrUpdateFromRemote(await _resolveRemoteCategory(rt));
       }
       return _local.transactions;
     } catch (e) {
@@ -160,7 +160,10 @@ class TransactionService extends ChangeNotifier {
           try {
             await _api.delete('${ApiConstants.transactions}/${transaction.id}');
             await _local.forceDeleteTransaction(transaction.localId);
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('Delete transaction failed: $e');
+            return false;
+          }
         } else if (transaction.syncStatus == 'local' || transaction.syncStatus == 'modified') {
           try {
             int? resolvedCategoryId = transaction.categoryId;
@@ -190,7 +193,10 @@ class TransactionService extends ChangeNotifier {
               categoryId: () => resolvedCategoryId,
               syncStatus: 'synced',
             ));
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('Upsert transaction failed: $e');
+            return false;
+          }
         }
       }
 
@@ -203,7 +209,7 @@ class TransactionService extends ChangeNotifier {
       }
       for (final e in remoteData) {
         final remote = Transaction.fromJson(e as Map<String, dynamic>).copyWith(syncStatus: 'synced');
-        await _local.addOrUpdateFromRemote(remote);
+        await _local.addOrUpdateFromRemote(await _resolveRemoteCategory(remote));
       }
 
       notifyListeners();
@@ -213,5 +219,14 @@ class TransactionService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  Future<Transaction> _resolveRemoteCategory(Transaction transaction) async {
+    if (transaction.categoryId == null || _categoryLocal == null) {
+      return transaction;
+    }
+    final category = await _categoryLocal.getCategoryByRemoteId(transaction.categoryId!);
+    if (category == null) return transaction;
+    return transaction.copyWith(localCategoryId: () => category.localId);
   }
 }

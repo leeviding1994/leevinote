@@ -19,15 +19,17 @@ public class FolderService {
         return folderRepository.save(folder);
     }
 
-    public Folder updateFolder(Long id, Folder updated) {
-        Folder folder = folderRepository.findById(id)
+    public Folder updateFolder(Long userId, Long id, Folder updated) {
+        Folder folder = folderRepository.findByIdAndUserId(id, userId)
             .orElseThrow(() -> new RuntimeException("Folder not found: " + id));
         folder.setName(updated.getName());
         folder.setParentId(updated.getParentId());
         return folderRepository.save(folder);
     }
 
-    public void deleteFolder(Long id) {
-        folderRepository.deleteById(id);
+    public void deleteFolder(Long userId, Long id) {
+        Folder folder = folderRepository.findByIdAndUserId(id, userId)
+            .orElseThrow(() -> new RuntimeException("Folder not found: " + id));
+        folderRepository.delete(folder);
     }
 }

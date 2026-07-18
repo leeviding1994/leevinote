@@ -6,12 +6,15 @@ import com.leevinote.backend.entity.User;
 import com.leevinote.backend.repository.UserRepository;
 import com.leevinote.backend.service.TransactionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -22,14 +25,15 @@ public class TransactionController {
     private final UserRepository userRepository;
 
     @GetMapping
-    public ResponseEntity<List<Transaction>> getTransactions(
+    public ResponseEntity<Page<Transaction>> getTransactions(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @PageableDefault(size = 50, sort = {"transactionDate", "createdAt"}, direction = Sort.Direction.DESC) Pageable pageable) {
         Long userId = getCurrentUserId();
         if (startDate != null && endDate != null) {
-            return ResponseEntity.ok(transactionService.getTransactionsByUserAndDateRange(userId, startDate, endDate));
+            return ResponseEntity.ok(transactionService.getTransactionsByUserAndDateRange(userId, startDate, endDate, pageable));
         }
-        return ResponseEntity.ok(transactionService.getTransactionsByUser(userId));
+        return ResponseEntity.ok(transactionService.getTransactionsByUser(userId, pageable));
     }
 
     @PostMapping
@@ -43,10 +47,7 @@ public class TransactionController {
     @PutMapping("/{id}")
     public ResponseEntity<Transaction> updateTransaction(@PathVariable Long id, @RequestBody Transaction transaction) {
         Long userId = getCurrentUserId();
-        User user = new User();
-        user.setId(userId);
-        transaction.setUser(user);
-        return ResponseEntity.ok(transactionService.updateTransaction(id, transaction));
+        return ResponseEntity.ok(transactionService.updateTransaction(userId, id, transaction));
     }
 
     @DeleteMapping("/{id}")

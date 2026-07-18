@@ -3,6 +3,8 @@ package com.leevinote.backend.service;
 import com.leevinote.backend.entity.Schedule;
 import com.leevinote.backend.repository.ScheduleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +16,10 @@ public class ScheduleService {
 
     public List<Schedule> getSchedulesByUser(Long userId) {
         return scheduleRepository.findByUserIdOrderByStartTimeAsc(userId);
+    }
+
+    public Page<Schedule> getSchedulesByUser(Long userId, Pageable pageable) {
+        return scheduleRepository.findByUserId(userId, pageable);
     }
 
     public Schedule createSchedule(Schedule schedule) {

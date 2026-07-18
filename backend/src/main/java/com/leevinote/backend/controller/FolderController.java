@@ -31,12 +31,12 @@ public class FolderController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Folder> updateFolder(@PathVariable Long id, @RequestBody Folder folder) {
-        return ResponseEntity.ok(folderService.updateFolder(id, folder));
+        return ResponseEntity.ok(folderService.updateFolder(getCurrentUserId(), id, folder));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteFolder(@PathVariable Long id) {
-        folderService.deleteFolder(id);
+        folderService.deleteFolder(getCurrentUserId(), id);
         return ResponseEntity.ok(Map.of("message", "Folder deleted"));
     }
 

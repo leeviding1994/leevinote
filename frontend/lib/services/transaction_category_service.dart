@@ -73,26 +73,41 @@ class TransactionCategoryService extends ChangeNotifier {
           try {
             await _api.delete('${ApiConstants.transactionCategories}/${category.id}');
             await _local.forceDeleteCategory(category.localId);
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('Delete transaction category failed: $e');
+            return false;
+          }
         } else if (category.syncStatus == 'local' || category.syncStatus == 'modified') {
           try {
-            final result = await _api.post(
-              ApiConstants.transactionCategories,
-              category.toRemoteJson(),
-            );
+            final Map<String, dynamic> result;
+            if (category.id != null) {
+              result = await _api.put(
+                '${ApiConstants.transactionCategories}/${category.id}',
+                category.toRemoteJson(),
+              );
+            } else {
+              result = await _api.post(
+                ApiConstants.transactionCategories,
+                category.toRemoteJson(),
+              );
+            }
             final remoteId = result['id'];
             final newId = remoteId is int
                 ? remoteId
                 : int.tryParse(remoteId?.toString() ?? '');
             await _local.updateCategory(category.copyWith(
-              id: newId,
+              id: newId ?? category.id,
               syncStatus: 'synced',
             ));
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('Upsert transaction category failed: $e');
+            return false;
+          }
         }
       }
 
       final remoteData = await _api.getList(ApiConstants.transactionCategories);
+      debugPrint('Fetched transaction categories: ${remoteData.length}');
       final remoteIds = remoteData.map((e) => (e as Map)['id'] as int?).whereType<int>().toSet();
       for (final category in List.from(_local.categories)) {
         if (category.id != null && category.syncStatus == 'synced' && !remoteIds.contains(category.id)) {
@@ -101,7 +116,7 @@ class TransactionCategoryService extends ChangeNotifier {
       }
       for (final e in remoteData) {
         final remote = TransactionCategory.fromJson(e as Map<String, dynamic>).copyWith(syncStatus: 'synced');
-        await _local.addOrUpdateFromRemote(remote);
+        await _local.addOrUpdateFromRemote(remote, force: true);
       }
 
       notifyListeners();

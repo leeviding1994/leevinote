@@ -6,6 +6,8 @@ import com.leevinote.backend.repository.TransactionRepository;
 import com.leevinote.backend.repository.TransactionRepository.PeriodTotalProjection;
 import com.leevinote.backend.repository.TransactionRepository.TypeTotalProjection;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,21 +25,27 @@ public class TransactionService {
         return transactionRepository.findByUserIdAndIsDeletedFalseOrderByTransactionDateDescCreatedAtDesc(userId);
     }
 
+    public Page<Transaction> getTransactionsByUser(Long userId, Pageable pageable) {
+        return transactionRepository.findByUserIdAndIsDeletedFalse(userId, pageable);
+    }
+
     public List<Transaction> getTransactionsByUserAndDateRange(Long userId, LocalDate startDate, LocalDate endDate) {
         return transactionRepository.findByUserIdAndTransactionDateBetweenAndIsDeletedFalseOrderByTransactionDateDescCreatedAtDesc(
                 userId, startDate, endDate);
+    }
+
+    public Page<Transaction> getTransactionsByUserAndDateRange(Long userId, LocalDate startDate, LocalDate endDate, Pageable pageable) {
+        return transactionRepository.findByUserIdAndTransactionDateBetweenAndIsDeletedFalse(
+                userId, startDate, endDate, pageable);
     }
 
     public Transaction createTransaction(Transaction transaction) {
         return transactionRepository.save(transaction);
     }
 
-    public Transaction updateTransaction(Long id, Transaction updated) {
-        Transaction transaction = transactionRepository.findById(id)
+    public Transaction updateTransaction(Long userId, Long id, Transaction updated) {
+        Transaction transaction = transactionRepository.findByIdAndUserIdAndIsDeletedFalse(id, userId)
             .orElseThrow(() -> new RuntimeException("Transaction not found: " + id));
-        if (updated.getUser() != null && !updated.getUser().getId().equals(transaction.getUser().getId())) {
-            throw new RuntimeException("Transaction does not belong to current user");
-        }
         transaction.setType(updated.getType());
         transaction.setAmount(updated.getAmount());
         transaction.setTransactionDate(updated.getTransactionDate());
@@ -47,11 +55,8 @@ public class TransactionService {
     }
 
     public void deleteTransaction(Long userId, Long id) {
-        Transaction transaction = transactionRepository.findById(id)
+        Transaction transaction = transactionRepository.findByIdAndUserIdAndIsDeletedFalse(id, userId)
             .orElseThrow(() -> new RuntimeException("Transaction not found: " + id));
-        if (!transaction.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Transaction does not belong to current user");
-        }
         transaction.setIsDeleted(true);
         transactionRepository.save(transaction);
     }

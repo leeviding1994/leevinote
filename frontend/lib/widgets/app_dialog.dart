@@ -14,6 +14,8 @@ class AppDialog {
     bool destructive = false,
     VoidCallback? onConfirm,
     VoidCallback? onCancel,
+    T? confirmResult,
+    T? cancelResult,
     bool barrierDismissible = true,
   }) {
     final theme = Theme.of(context);
@@ -51,7 +53,7 @@ class AppDialog {
                           label: cancelLabel,
                           onPressed: () {
                             if (onCancel != null) onCancel();
-                            Navigator.pop(ctx);
+                            Navigator.pop(ctx, cancelResult);
                           },
                         ),
                       ),
@@ -63,7 +65,7 @@ class AppDialog {
                         destructive: destructive,
                         onPressed: () {
                           if (onConfirm != null) onConfirm();
-                          Navigator.pop(ctx);
+                          Navigator.pop(ctx, confirmResult);
                         },
                       ),
                     ),
@@ -92,6 +94,8 @@ class AppDialog {
       confirmLabel: confirmLabel,
       cancelLabel: cancelLabel,
       destructive: destructive,
+      confirmResult: true,
+      cancelResult: false,
     );
   }
 }
