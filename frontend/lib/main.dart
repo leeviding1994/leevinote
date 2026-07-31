@@ -234,7 +234,7 @@ class _AuthCallbackSetterState extends State<_AuthCallbackSetter> {
       if (mounted) {
         navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
+          (route) => route.isFirst,
         );
       }
     }
