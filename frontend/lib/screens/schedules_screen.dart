@@ -45,23 +45,23 @@ const _scheduleColors = [
   Color(0xFF64748B), // 灰蓝
 ];
 
-  Color _getScheduleColor(int index) {
-    return _scheduleColors[index % _scheduleColors.length];
-  }
+Color _getScheduleColor(int index) {
+  return _scheduleColors[index % _scheduleColors.length];
+}
 
-  Widget _todayBadge(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary,
-        borderRadius: BorderRadius.circular(AppRadius.xs),
-      ),
-      child: Text(
-        '今',
-        style: AppTypography.smallMediumLight(color: Colors.white),
-      ),
-    );
-  }
+Widget _todayBadge(BuildContext context) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.primary,
+      borderRadius: BorderRadius.circular(AppRadius.xs),
+    ),
+    child: Text(
+      '今',
+      style: AppTypography.smallMediumLight(color: Colors.white),
+    ),
+  );
+}
 
 String _getLunarDayShort(DateTime date) {
   try {
@@ -107,6 +107,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
   DateTime? _searchEndDate;
   List<Schedule> _searchResults = [];
 
+  bool get isSearching => _isSearching;
+
   @override
   void initState() {
     super.initState();
@@ -129,13 +131,11 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     if (!mounted) return;
     final success = await scheduleService.sync();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success ? '日程同步完成' : '同步失败'),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
-        ),
-      );
+      if (success) {
+        AppToast.success(context, '日程同步完成');
+      } else {
+        AppToast.error(context, '同步失败');
+      }
     }
   }
 
@@ -215,13 +215,6 @@ class SchedulesScreenState extends State<SchedulesScreen> {
           ),
         ],
       ),
-      floatingActionButton: _isSearching
-          ? null
-          : FloatingActionButton(
-              heroTag: 'schedules_fab',
-              onPressed: () => _showAddScheduleDialog(context),
-              child: const Icon(Icons.add),
-            ),
     );
   }
 
@@ -374,7 +367,9 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                   Text(
                     '周${_weekdayNames[_selectedDay.weekday] ?? ''}',
                     style: AppTypography.bodyLight(
-                      color: isWeekend || isHoli ? AppColors.error : AppColors.secondaryText,
+                      color: isWeekend || isHoli
+                          ? AppColors.error
+                          : AppColors.secondaryText,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -398,7 +393,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                     ),
                     child: Text(
                       holiday.name,
-                      style: AppTypography.smallMediumLight(color: AppColors.error),
+                      style: AppTypography.smallMediumLight(
+                          color: AppColors.error),
                     ),
                   ),
                 ),
@@ -472,7 +468,9 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                     Checkbox(
                       value: event.completed,
                       onChanged: (v) {
-                        context.read<ScheduleService>().toggleCompleted(event.localId);
+                        context
+                            .read<ScheduleService>()
+                            .toggleCompleted(event.localId);
                       },
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       visualDensity: VisualDensity.compact,
@@ -486,24 +484,37 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                           Text(
                             event.title,
                             style: AppTypography.bodyMediumLight(
-                              color: event.completed ? AppColors.tertiaryText : null,
-                              decoration: event.completed ? TextDecoration.lineThrough : null,
+                              color: event.completed
+                                  ? AppColors.tertiaryText
+                                  : null,
+                              decoration: event.completed
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             ),
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             isAllDay ? '全天' : '$startStr - $endStr',
                             style: AppTypography.captionLight(
-                              color: event.completed ? AppColors.tertiaryText : null,
-                              decoration: event.completed ? TextDecoration.lineThrough : null,
+                              color: event.completed
+                                  ? AppColors.tertiaryText
+                                  : null,
+                              decoration: event.completed
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             ),
                           ),
-                          if (event.location != null && event.location!.isNotEmpty)
+                          if (event.location != null &&
+                              event.location!.isNotEmpty)
                             Text(
                               event.location!,
                               style: AppTypography.smallLight(
-                                color: event.completed ? AppColors.tertiaryText : null,
-                                decoration: event.completed ? TextDecoration.lineThrough : null,
+                                color: event.completed
+                                    ? AppColors.tertiaryText
+                                    : null,
+                                decoration: event.completed
+                                    ? TextDecoration.lineThrough
+                                    : null,
                               ),
                             ),
                         ],
@@ -547,8 +558,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
               ),
               Text(
                 '$currentYear年',
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right),
@@ -575,10 +586,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
             itemCount: 12,
             itemBuilder: (context, index) {
               final month = index + 1;
-              final daysInMonth =
-                  DateTime(currentYear, month + 1, 0).day;
-              final firstWeekday =
-                  DateTime(currentYear, month, 1).weekday;
+              final daysInMonth = DateTime(currentYear, month + 1, 0).day;
+              final firstWeekday = DateTime(currentYear, month, 1).weekday;
               final hasEvents = service.schedules.any((s) =>
                   s.startTime.year == currentYear &&
                   s.startTime.month == month);
@@ -693,7 +702,9 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                     width: 14,
                     height: 14,
                     decoration: BoxDecoration(
-                      color: allCompleted ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+                      color: allCompleted
+                          ? Colors.green.withValues(alpha: 0.15)
+                          : Colors.red.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: allCompleted ? Colors.green : Colors.red,
@@ -774,8 +785,10 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                     final date = await showDatePicker(
                       context: context,
                       initialDate: _searchStartDate ?? DateTime.now(),
-                      firstDate: DateTime.now().subtract(const Duration(days: 365 * 5)),
-                      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                      firstDate: DateTime.now()
+                          .subtract(const Duration(days: 365 * 5)),
+                      lastDate:
+                          DateTime.now().add(const Duration(days: 365 * 5)),
                     );
                     if (date != null) {
                       setState(() => _searchStartDate = date);
@@ -793,7 +806,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                             Text('开始日期', style: AppTypography.smallLight()),
                             Text(
                               _searchStartDate != null
-                                  ? DateFormat('yyyy-MM-dd').format(_searchStartDate!)
+                                  ? DateFormat('yyyy-MM-dd')
+                                      .format(_searchStartDate!)
                                   : '不限',
                               style: AppTypography.bodyMediumLight(),
                             ),
@@ -812,8 +826,10 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                     final date = await showDatePicker(
                       context: context,
                       initialDate: _searchEndDate ?? DateTime.now(),
-                      firstDate: DateTime.now().subtract(const Duration(days: 365 * 5)),
-                      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                      firstDate: DateTime.now()
+                          .subtract(const Duration(days: 365 * 5)),
+                      lastDate:
+                          DateTime.now().add(const Duration(days: 365 * 5)),
                     );
                     if (date != null) {
                       setState(() => _searchEndDate = date);
@@ -831,7 +847,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                             Text('结束日期', style: AppTypography.smallLight()),
                             Text(
                               _searchEndDate != null
-                                  ? DateFormat('yyyy-MM-dd').format(_searchEndDate!)
+                                  ? DateFormat('yyyy-MM-dd')
+                                      .format(_searchEndDate!)
                                   : '不限',
                               style: AppTypography.bodyMediumLight(),
                             ),
@@ -897,7 +914,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(event.title, style: AppTypography.bodyMediumLight()),
+                        Text(event.title,
+                            style: AppTypography.bodyMediumLight()),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
                           isAllDay
@@ -929,7 +947,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     final holidayService = context.read<HolidayService>();
     final isHoli = holidayService.isHoliday(day);
     final holiday = holidayService.getHoliday(day);
-    final isWeekend = day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
+    final isWeekend =
+        day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
     final lunarFull = _getLunarFull(day);
     final isToday = isSameDay(day, DateTime.now());
 
@@ -962,7 +981,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                             AppSpacing.lg,
                           ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primaryContainer,
+                            color:
+                                Theme.of(context).colorScheme.primaryContainer,
                             borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(AppRadius.lg),
                             ),
@@ -991,7 +1011,9 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                         Text(
                                           '周${_weekdayNames[day.weekday] ?? ''}',
                                           style: AppTypography.captionLight(
-                                            color: isWeekend || isHoli ? AppColors.error : AppColors.secondaryText,
+                                            color: isWeekend || isHoli
+                                                ? AppColors.error
+                                                : AppColors.secondaryText,
                                           ),
                                         ),
                                         const SizedBox(width: AppSpacing.md),
@@ -1007,12 +1029,17 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                               vertical: AppSpacing.xs,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: AppColors.error.withValues(alpha: 0.08),
-                                              borderRadius: BorderRadius.circular(AppRadius.xs),
+                                              color: AppColors.error
+                                                  .withValues(alpha: 0.08),
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                      AppRadius.xs),
                                             ),
                                             child: Text(
                                               holiday.name,
-                                              style: AppTypography.smallMediumLight(color: AppColors.error),
+                                              style: AppTypography
+                                                  .smallMediumLight(
+                                                      color: AppColors.error),
                                             ),
                                           ),
                                         ],
@@ -1035,7 +1062,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                             child: Center(
                               child: Text(
                                 '暂无日程',
-                                style: AppTypography.bodyLight(color: AppColors.tertiaryText),
+                                style: AppTypography.bodyLight(
+                                    color: AppColors.tertiaryText),
                               ),
                             ),
                           )
@@ -1052,22 +1080,29 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                               itemCount: events.length,
                               itemBuilder: (context, index) {
                                 final event = events[index];
-                                final startStr = DateFormat('HH:mm').format(event.startTime);
-                                final endStr = DateFormat('HH:mm').format(event.endTime);
-                                final isAllDay = event.startTime.hour == 0 && event.endTime.hour == 23;
+                                final startStr =
+                                    DateFormat('HH:mm').format(event.startTime);
+                                final endStr =
+                                    DateFormat('HH:mm').format(event.endTime);
+                                final isAllDay = event.startTime.hour == 0 &&
+                                    event.endTime.hour == 23;
 
                                 return Padding(
-                                  padding: const EdgeInsets.only(bottom: AppSpacing.listItemGap),
+                                  padding: const EdgeInsets.only(
+                                      bottom: AppSpacing.listItemGap),
                                   child: AppCard(
                                     child: Row(
                                       children: [
                                         Checkbox(
                                           value: event.completed,
                                           onChanged: (v) {
-                                            context.read<ScheduleService>().toggleCompleted(event.localId);
+                                            context
+                                                .read<ScheduleService>()
+                                                .toggleCompleted(event.localId);
                                             setDialogState(() {});
                                           },
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
                                           visualDensity: VisualDensity.compact,
                                         ),
                                         const SizedBox(width: AppSpacing.xs),
@@ -1075,29 +1110,47 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                           child: InkWell(
                                             onTap: () {
                                               Navigator.pop(ctx);
-                                              _showEditScheduleDialog(context, event);
+                                              _showEditScheduleDialog(
+                                                  context, event);
                                             },
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 Text(
                                                   event.title,
-                                                  style: AppTypography.bodyMediumLight(
-                                                    color: event.completed ? AppColors.tertiaryText : null,
-                                                    decoration: event.completed ? TextDecoration.lineThrough : null,
+                                                  style: AppTypography
+                                                      .bodyMediumLight(
+                                                    color: event.completed
+                                                        ? AppColors.tertiaryText
+                                                        : null,
+                                                    decoration: event.completed
+                                                        ? TextDecoration
+                                                            .lineThrough
+                                                        : null,
                                                   ),
                                                 ),
-                                                const SizedBox(height: AppSpacing.xs),
+                                                const SizedBox(
+                                                    height: AppSpacing.xs),
                                                 Text(
                                                   isAllDay
                                                       ? '全天'
-                                                      : event.location != null && event.location!.isNotEmpty
+                                                      : event.location !=
+                                                                  null &&
+                                                              event.location!
+                                                                  .isNotEmpty
                                                           ? '$startStr - $endStr · ${event.location}'
                                                           : '$startStr - $endStr',
-                                                  style: AppTypography.smallLight(
-                                                    color: event.completed ? AppColors.tertiaryText : null,
-                                                    decoration: event.completed ? TextDecoration.lineThrough : null,
+                                                  style:
+                                                      AppTypography.smallLight(
+                                                    color: event.completed
+                                                        ? AppColors.tertiaryText
+                                                        : null,
+                                                    decoration: event.completed
+                                                        ? TextDecoration
+                                                            .lineThrough
+                                                        : null,
                                                   ),
                                                 ),
                                               ],
@@ -1161,7 +1214,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                 icon: Icons.chevron_left,
                 onPressed: () {
                   setState(() {
-                    _selectedDay = _selectedDay.subtract(const Duration(days: 7));
+                    _selectedDay =
+                        _selectedDay.subtract(const Duration(days: 7));
                   });
                 },
               ),
@@ -1201,7 +1255,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     HolidayService holidayService,
   ) {
     final events = service.getSchedulesForDate(day);
-    final isWeekend = day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
+    final isWeekend =
+        day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
     final isHoli = holidayService.isHoliday(day);
     final holiday = holidayService.isHolidayNameDay(day)
         ? holidayService.getHoliday(day)
@@ -1209,11 +1264,13 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     final isToday = isSameDay(day, DateTime.now());
 
     // 全天日程
-    final allDayEvents = events.where((e) =>
-        e.startTime.hour == 0 && e.endTime.hour == 23).toList();
+    final allDayEvents = events
+        .where((e) => e.startTime.hour == 0 && e.endTime.hour == 23)
+        .toList();
     // 普通日程
-    final timedEvents = events.where((e) =>
-        !(e.startTime.hour == 0 && e.endTime.hour == 23)).toList();
+    final timedEvents = events
+        .where((e) => !(e.startTime.hour == 0 && e.endTime.hour == 23))
+        .toList();
 
     // 按行分配重叠日程
     final List<List<Schedule>> rows = [];
@@ -1234,10 +1291,10 @@ class SchedulesScreenState extends State<SchedulesScreen> {
     const double rowHeight = 22;
     const double rowGap = 3;
     final double allDayHeight = allDayEvents.isNotEmpty ? 24.0 : 0.0;
-    final double allDayGap = allDayEvents.isNotEmpty && rows.isNotEmpty ? 4.0 : 0.0;
-    final double timelineHeight = rows.isEmpty
-        ? 0
-        : rows.length * rowHeight + (rows.length - 1) * rowGap;
+    final double allDayGap =
+        allDayEvents.isNotEmpty && rows.isNotEmpty ? 4.0 : 0.0;
+    final double timelineHeight =
+        rows.isEmpty ? 0 : rows.length * rowHeight + (rows.length - 1) * rowGap;
     final double contentHeight = allDayHeight + allDayGap + timelineHeight;
 
     return InkWell(
@@ -1277,8 +1334,10 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                             : events.isNotEmpty
                                 ? BoxDecoration(
                                     color: events.every((s) => s.completed)
-                                        ? AppColors.success.withValues(alpha: 0.12)
-                                        : AppColors.error.withValues(alpha: 0.12),
+                                        ? AppColors.success
+                                            .withValues(alpha: 0.12)
+                                        : AppColors.error
+                                            .withValues(alpha: 0.12),
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: events.every((s) => s.completed)
@@ -1312,7 +1371,9 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                   Text(
                     '周${_weekdayNames[day.weekday] ?? ''}',
                     style: AppTypography.smallLight(
-                      color: isWeekend || isHoli ? AppColors.error : AppColors.secondaryText,
+                      color: isWeekend || isHoli
+                          ? AppColors.error
+                          : AppColors.secondaryText,
                     ),
                   ),
                   Text(
@@ -1359,10 +1420,10 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                         return Container(
                           height: 38,
                           alignment: Alignment.center,
-                            child: Text(
-                              '无日程',
-                              style: AppTypography.smallLight(),
-                            ),
+                          child: Text(
+                            '无日程',
+                            style: AppTypography.smallLight(),
+                          ),
                         );
                       }
 
@@ -1380,14 +1441,15 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                   children: allDayEvents.map((e) {
                                     final colorIndex = e.localId.hashCode.abs();
                                     final color = _getScheduleColor(colorIndex);
-                                        return Expanded(
+                                    return Expanded(
                                       child: Container(
                                         margin: const EdgeInsets.only(right: 2),
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 4, vertical: 2),
                                         decoration: BoxDecoration(
                                           color: color.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(2),
+                                          borderRadius:
+                                              BorderRadius.circular(2),
                                         ),
                                         child: Text(
                                           e.title,
@@ -1395,7 +1457,9 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                             fontSize: 10,
                                             color: color,
                                             overflow: TextOverflow.ellipsis,
-                                            decoration: e.completed ? TextDecoration.lineThrough : null,
+                                            decoration: e.completed
+                                                ? TextDecoration.lineThrough
+                                                : null,
                                           ),
                                           maxLines: 1,
                                         ),
@@ -1405,35 +1469,51 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                 ),
                               ),
                             // 各行列的普通日程
-                            for (int rowIndex = 0; rowIndex < rows.length; rowIndex++)
+                            for (int rowIndex = 0;
+                                rowIndex < rows.length;
+                                rowIndex++)
                               Positioned(
-                                top: allDayHeight + allDayGap + rowIndex * (rowHeight + rowGap),
+                                top: allDayHeight +
+                                    allDayGap +
+                                    rowIndex * (rowHeight + rowGap),
                                 left: 0,
                                 right: 0,
                                 child: SizedBox(
                                   height: rowHeight,
                                   child: Stack(
                                     children: rows[rowIndex].map((e) {
-                                      final startMin = e.startTime.hour * 60 + e.startTime.minute;
-                                      final endMin = e.endTime.hour * 60 + e.endTime.minute;
-                                      final left = (startMin / 1440.0) * timelineWidth;
-                                      final width = ((endMin - startMin) / 1440.0) * timelineWidth;
-                                      final colorIndex = e.localId.hashCode.abs();
-                                      final color = _getScheduleColor(colorIndex);
+                                      final startMin = e.startTime.hour * 60 +
+                                          e.startTime.minute;
+                                      final endMin = e.endTime.hour * 60 +
+                                          e.endTime.minute;
+                                      final left =
+                                          (startMin / 1440.0) * timelineWidth;
+                                      final width =
+                                          ((endMin - startMin) / 1440.0) *
+                                              timelineWidth;
+                                      final colorIndex =
+                                          e.localId.hashCode.abs();
+                                      final color =
+                                          _getScheduleColor(colorIndex);
                                       return Positioned(
                                         left: left,
-                                        width: width.clamp(40, timelineWidth - left),
+                                        width: width.clamp(
+                                            40, timelineWidth - left),
                                         child: GestureDetector(
-                                          onTap: () => _showEditScheduleDialog(context, e),
+                                          onTap: () => _showEditScheduleDialog(
+                                              context, e),
                                           child: Container(
                                             height: rowHeight,
-                                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 4),
                                             decoration: BoxDecoration(
                                               color: color,
-                                              borderRadius: BorderRadius.circular(4),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: color.withValues(alpha: 0.3),
+                                                  color: color.withValues(
+                                                      alpha: 0.3),
                                                   blurRadius: 2,
                                                   offset: const Offset(0, 1),
                                                 ),
@@ -1447,18 +1527,28 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                                     style: TextStyle(
                                                       fontSize: 9,
                                                       color: Colors.white,
-                                                      overflow: TextOverflow.ellipsis,
-                                                      decoration: e.completed ? TextDecoration.lineThrough : null,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      decoration: e.completed
+                                                          ? TextDecoration
+                                                              .lineThrough
+                                                          : null,
                                                     ),
                                                     maxLines: 1,
                                                   ),
                                                 ),
                                                 Text(
-                                                  DateFormat('HH:mm').format(e.startTime),
+                                                  DateFormat('HH:mm')
+                                                      .format(e.startTime),
                                                   style: TextStyle(
                                                     fontSize: 8,
-                                                    color: Colors.white.withValues(alpha: 0.85),
-                                                    decoration: e.completed ? TextDecoration.lineThrough : null,
+                                                    color: Colors.white
+                                                        .withValues(
+                                                            alpha: 0.85),
+                                                    decoration: e.completed
+                                                        ? TextDecoration
+                                                            .lineThrough
+                                                        : null,
                                                   ),
                                                 ),
                                               ],
@@ -1551,17 +1641,23 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                               )
                             : isToday && events.isEmpty
                                 ? BoxDecoration(
-                                    color: Theme.of(context).colorScheme.primaryContainer,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primaryContainer,
                                     shape: BoxShape.circle,
                                   )
                                 : events.isNotEmpty
                                     ? BoxDecoration(
                                         color: allCompleted
-                                            ? AppColors.success.withValues(alpha: 0.12)
-                                            : AppColors.error.withValues(alpha: 0.12),
+                                            ? AppColors.success
+                                                .withValues(alpha: 0.12)
+                                            : AppColors.error
+                                                .withValues(alpha: 0.12),
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: allCompleted ? AppColors.success : AppColors.error,
+                                          color: allCompleted
+                                              ? AppColors.success
+                                              : AppColors.error,
                                           width: 1,
                                         ),
                                       )
@@ -1570,7 +1666,9 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                           '${date.day}',
                           style: AppTypography.bodyMediumLight(
                             color: isToday && events.isNotEmpty
-                                ? (allCompleted ? AppColors.success : AppColors.error)
+                                ? (allCompleted
+                                    ? AppColors.success
+                                    : AppColors.error)
                                 : textColor,
                           ),
                         ),
@@ -1604,7 +1702,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: events.map((e) {
-                    final isAllDay = e.startTime.hour == 0 && e.endTime.hour == 23;
+                    final isAllDay =
+                        e.startTime.hour == 0 && e.endTime.hour == 23;
                     final timeStr = isAllDay
                         ? '全天'
                         : '${DateFormat('HH:mm').format(e.startTime)}-${DateFormat('HH:mm').format(e.endTime)}';
@@ -1612,9 +1711,11 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                     final color = _getScheduleColor(colorIndex);
                     return Container(
                       margin: const EdgeInsets.only(top: 1),
-                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 2, vertical: 1),
                       decoration: BoxDecoration(
-                        color: color.withValues(alpha: isSelected ? 0.25 : 0.15),
+                        color:
+                            color.withValues(alpha: isSelected ? 0.25 : 0.15),
                         borderRadius: BorderRadius.circular(2),
                       ),
                       child: Row(
@@ -1631,9 +1732,12 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                           Expanded(
                             child: Text(
                               '$timeStr ${e.title}',
-                              style: AppTypography.smallLight(color: color).copyWith(
+                              style: AppTypography.smallLight(color: color)
+                                  .copyWith(
                                 height: 1.1,
-                                decoration: e.completed ? TextDecoration.lineThrough : null,
+                                decoration: e.completed
+                                    ? TextDecoration.lineThrough
+                                    : null,
                               ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
@@ -1655,55 +1759,79 @@ class SchedulesScreenState extends State<SchedulesScreen> {
       HolidayService holidayService, ScheduleService service) {
     return CalendarBuilders(
       defaultBuilder: (context, date, _) => _buildDayCell(
-        context, date, service, holidayService,
+        context,
+        date,
+        service,
+        holidayService,
         isSelected: isSameDay(_selectedDay, date),
         isToday: isSameDay(date, DateTime.now()),
-        isWeekend: date.weekday == DateTime.saturday || date.weekday == DateTime.sunday,
+        isWeekend: date.weekday == DateTime.saturday ||
+            date.weekday == DateTime.sunday,
         isHoliday: holidayService.isHoliday(date),
         isOutside: false,
         isDisabled: false,
       ),
       todayBuilder: (context, date, _) => _buildDayCell(
-        context, date, service, holidayService,
+        context,
+        date,
+        service,
+        holidayService,
         isSelected: isSameDay(_selectedDay, date),
         isToday: true,
-        isWeekend: date.weekday == DateTime.saturday || date.weekday == DateTime.sunday,
+        isWeekend: date.weekday == DateTime.saturday ||
+            date.weekday == DateTime.sunday,
         isHoliday: holidayService.isHoliday(date),
         isOutside: false,
         isDisabled: false,
       ),
       selectedBuilder: (context, date, _) => _buildDayCell(
-        context, date, service, holidayService,
+        context,
+        date,
+        service,
+        holidayService,
         isSelected: true,
         isToday: isSameDay(date, DateTime.now()),
-        isWeekend: date.weekday == DateTime.saturday || date.weekday == DateTime.sunday,
+        isWeekend: date.weekday == DateTime.saturday ||
+            date.weekday == DateTime.sunday,
         isHoliday: holidayService.isHoliday(date),
         isOutside: false,
         isDisabled: false,
       ),
       holidayBuilder: (context, date, _) => _buildDayCell(
-        context, date, service, holidayService,
+        context,
+        date,
+        service,
+        holidayService,
         isSelected: isSameDay(_selectedDay, date),
         isToday: isSameDay(date, DateTime.now()),
-        isWeekend: date.weekday == DateTime.saturday || date.weekday == DateTime.sunday,
+        isWeekend: date.weekday == DateTime.saturday ||
+            date.weekday == DateTime.sunday,
         isHoliday: true,
         isOutside: false,
         isDisabled: false,
       ),
       outsideBuilder: (context, date, _) => _buildDayCell(
-        context, date, service, holidayService,
+        context,
+        date,
+        service,
+        holidayService,
         isSelected: isSameDay(_selectedDay, date),
         isToday: isSameDay(date, DateTime.now()),
-        isWeekend: date.weekday == DateTime.saturday || date.weekday == DateTime.sunday,
+        isWeekend: date.weekday == DateTime.saturday ||
+            date.weekday == DateTime.sunday,
         isHoliday: holidayService.isHoliday(date),
         isOutside: true,
         isDisabled: false,
       ),
       disabledBuilder: (context, date, _) => _buildDayCell(
-        context, date, service, holidayService,
+        context,
+        date,
+        service,
+        holidayService,
         isSelected: isSameDay(_selectedDay, date),
         isToday: isSameDay(date, DateTime.now()),
-        isWeekend: date.weekday == DateTime.saturday || date.weekday == DateTime.sunday,
+        isWeekend: date.weekday == DateTime.saturday ||
+            date.weekday == DateTime.sunday,
         isHoliday: holidayService.isHoliday(date),
         isOutside: false,
         isDisabled: true,
@@ -1729,6 +1857,10 @@ class SchedulesScreenState extends State<SchedulesScreen> {
 
   void _showAddScheduleDialog(BuildContext context) {
     _showScheduleEditor(context, null);
+  }
+
+  void openAddSchedule() {
+    _showAddScheduleDialog(context);
   }
 
   void _showEditScheduleDialog(BuildContext context, Schedule schedule) {
@@ -1793,7 +1925,8 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                           children: [
                             Checkbox(
                               value: isAllDay,
-                              onChanged: (v) => setSheetState(() => isAllDay = v ?? false),
+                              onChanged: (v) =>
+                                  setSheetState(() => isAllDay = v ?? false),
                             ),
                             Text('全天', style: AppTypography.bodyLight()),
                           ],
@@ -1810,8 +1943,10 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                   final date = await showDatePicker(
                                     context: ctx,
                                     initialDate: startDate,
-                                    firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                                    firstDate: DateTime.now()
+                                        .subtract(const Duration(days: 30)),
+                                    lastDate: DateTime.now()
+                                        .add(const Duration(days: 365)),
                                   );
                                   if (date != null) {
                                     setSheetState(() => startDate = date);
@@ -1851,8 +1986,10 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                   final date = await showDatePicker(
                                     context: ctx,
                                     initialDate: endDate,
-                                    firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                                    firstDate: DateTime.now()
+                                        .subtract(const Duration(days: 30)),
+                                    lastDate: DateTime.now()
+                                        .add(const Duration(days: 365)),
                                   );
                                   if (date != null) {
                                     setSheetState(() => endDate = date);
@@ -1898,13 +2035,25 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                               return;
                             }
                             final start = isAllDay
-                                ? DateTime(startDate.year, startDate.month, startDate.day)
-                                : DateTime(startDate.year, startDate.month, startDate.day, startTime.hour, startTime.minute);
+                                ? DateTime(startDate.year, startDate.month,
+                                    startDate.day)
+                                : DateTime(
+                                    startDate.year,
+                                    startDate.month,
+                                    startDate.day,
+                                    startTime.hour,
+                                    startTime.minute);
                             final end = isAllDay
-                                ? DateTime(endDate.year, endDate.month, endDate.day, 23, 59)
-                                : DateTime(endDate.year, endDate.month, endDate.day, endTime.hour, endTime.minute);
-                            final description = descC.text.trim().isEmpty ? null : descC.text.trim();
-                            final location = locationC.text.trim().isEmpty ? null : locationC.text.trim();
+                                ? DateTime(endDate.year, endDate.month,
+                                    endDate.day, 23, 59)
+                                : DateTime(endDate.year, endDate.month,
+                                    endDate.day, endTime.hour, endTime.minute);
+                            final description = descC.text.trim().isEmpty
+                                ? null
+                                : descC.text.trim();
+                            final location = locationC.text.trim().isEmpty
+                                ? null
+                                : locationC.text.trim();
 
                             if (isEditing) {
                               final updated = schedule.copyWith(
@@ -1914,7 +2063,9 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                 endTime: end,
                                 location: location,
                               );
-                              context.read<ScheduleService>().updateSchedule(updated);
+                              context
+                                  .read<ScheduleService>()
+                                  .updateSchedule(updated);
                             } else {
                               final newSchedule = Schedule(
                                 title: titleC.text.trim(),
@@ -1923,7 +2074,9 @@ class SchedulesScreenState extends State<SchedulesScreen> {
                                 endTime: end,
                                 location: location,
                               );
-                              context.read<ScheduleService>().createSchedule(newSchedule);
+                              context
+                                  .read<ScheduleService>()
+                                  .createSchedule(newSchedule);
                             }
                             Navigator.pop(ctx);
                           },

@@ -44,7 +44,7 @@ class AppFAB extends StatelessWidget {
           onTap: onPressed,
           child: SizedBox(
             width: hasLabel ? null : 56,
-            height: 48,
+            height: hasLabel ? 48 : 56,
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: hasLabel ? AppSpacing.lg : 0,

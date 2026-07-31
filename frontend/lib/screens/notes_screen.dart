@@ -131,7 +131,9 @@ class NotesScreenState extends State<NotesScreen> {
           List<Widget> buildTree(List<Folder> items, {int depth = 0}) {
             final leftPadding = AppSpacing.pageHorizontal + depth * 24.0;
             return items.map((folder) {
-              if (folder.localId == excludeLocalId) return const SizedBox.shrink();
+              if (folder.localId == excludeLocalId) {
+                return const SizedBox.shrink();
+              }
               final children = childrenMap[folder.localId] ?? const <Folder>[];
               final hasChildren = children.isNotEmpty;
               final isExpanded = expandedFolders.contains(folder.localId);
@@ -165,7 +167,9 @@ class NotesScreenState extends State<NotesScreen> {
                               child: Padding(
                                 padding: const EdgeInsets.all(AppSpacing.xs),
                                 child: Icon(
-                                  isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
+                                  isExpanded
+                                      ? Icons.arrow_drop_down
+                                      : Icons.arrow_right,
                                   size: 20,
                                   color: AppColors.secondaryText,
                                 ),
@@ -173,19 +177,24 @@ class NotesScreenState extends State<NotesScreen> {
                             )
                           else
                             const SizedBox(width: 28),
-                          const Icon(Icons.folder_outlined, size: 20, color: AppColors.brand),
+                          const Icon(Icons.folder_outlined,
+                              size: 20, color: AppColors.brand),
                           const SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Text(
                               folder.name,
                               style: AppTypography.bodyLight(
-                                color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                                color: isSelected
+                                    ? Theme.of(context).colorScheme.primary
+                                    : null,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (isSelected)
-                            Icon(Icons.check, size: 18, color: Theme.of(context).colorScheme.primary),
+                            Icon(Icons.check,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.primary),
                         ],
                       ),
                     ),
@@ -221,7 +230,9 @@ class NotesScreenState extends State<NotesScreen> {
                             title: '无文件夹',
                             onTap: () => Navigator.pop(ctx, null),
                             trailing: selectedLocalId == null
-                                ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                                ? Icon(Icons.check,
+                                    color:
+                                        Theme.of(context).colorScheme.primary)
                                 : null,
                           ),
                         if (rootFolders.isNotEmpty) ...[
@@ -347,7 +358,8 @@ class NotesScreenState extends State<NotesScreen> {
         });
       }
     } else {
-      final results = await _noteService.getNotesByFolder(_selectedLocalFolderId);
+      final results =
+          await _noteService.getNotesByFolder(_selectedLocalFolderId);
       if (mounted) {
         setState(() {
           _filteredNotes = results;
@@ -435,7 +447,9 @@ class NotesScreenState extends State<NotesScreen> {
               parentId = localIdToRemoteId[folder.localParentId];
             } else {
               final allFolders = _folderService.folders;
-              final parentFolder = allFolders.where((f) => f.localId == folder.localParentId).firstOrNull;
+              final parentFolder = allFolders
+                  .where((f) => f.localId == folder.localParentId)
+                  .firstOrNull;
               if (parentFolder != null && parentFolder.id != null) {
                 parentId = parentFolder.id;
               }
@@ -467,7 +481,9 @@ class NotesScreenState extends State<NotesScreen> {
               parentId = localIdToRemoteId[folder.localParentId];
             } else {
               final allFolders = _folderService.folders;
-              final parentFolder = allFolders.where((f) => f.localId == folder.localParentId).firstOrNull;
+              final parentFolder = allFolders
+                  .where((f) => f.localId == folder.localParentId)
+                  .firstOrNull;
               if (parentFolder != null && parentFolder.id != null) {
                 parentId = parentFolder.id;
               }
@@ -496,7 +512,9 @@ class NotesScreenState extends State<NotesScreen> {
               folderId = localIdToRemoteId[note.localFolderId];
             } else {
               final allFolders = _folderService.folders;
-              final folder = allFolders.where((f) => f.localId == note.localFolderId).firstOrNull;
+              final folder = allFolders
+                  .where((f) => f.localId == note.localFolderId)
+                  .firstOrNull;
               if (folder != null && folder.id != null) {
                 folderId = folder.id;
               }
@@ -529,7 +547,9 @@ class NotesScreenState extends State<NotesScreen> {
               folderId = localIdToRemoteId[note.localFolderId];
             } else {
               final allFolders = _folderService.folders;
-              final folder = allFolders.where((f) => f.localId == note.localFolderId).firstOrNull;
+              final folder = allFolders
+                  .where((f) => f.localId == note.localFolderId)
+                  .firstOrNull;
               if (folder != null && folder.id != null) {
                 folderId = folder.id;
               }
@@ -557,10 +577,8 @@ class NotesScreenState extends State<NotesScreen> {
       final remoteFolderList = (await api.getList(ApiConstants.folders))
           .map((e) => Folder.fromJson(e as Map<String, dynamic>))
           .toList();
-      final remoteFolderIds = remoteFolderList
-          .map((f) => f.id)
-          .whereType<int>()
-          .toSet();
+      final remoteFolderIds =
+          remoteFolderList.map((f) => f.id).whereType<int>().toSet();
       for (final folder in List.from(_folderService.folders)) {
         if (folder.id != null &&
             folder.syncStatus == 'synced' &&
@@ -625,13 +643,7 @@ class NotesScreenState extends State<NotesScreen> {
       await _updateFilteredNotes();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('同步完成'),
-            behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
-          ),
-        );
+        AppToast.success(context, '同步完成');
       }
     } catch (e, st) {
       debugPrint('同步失败: $e\n$st');
@@ -649,13 +661,7 @@ class NotesScreenState extends State<NotesScreen> {
           }
         }
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('同步失败: $e'),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
-          ),
-        );
+        AppToast.error(context, '同步失败: $e');
       }
     }
   }
@@ -670,6 +676,8 @@ class NotesScreenState extends State<NotesScreen> {
         ),
       ),
     );
+    if (!mounted) return;
+    await _updateFilteredNotes();
   }
 
   Future<void> openEditorInFolder(String? localFolderId) async {
@@ -683,6 +691,8 @@ class NotesScreenState extends State<NotesScreen> {
         ),
       ),
     );
+    if (!mounted) return;
+    await _updateFilteredNotes();
   }
 
   void selectFolder(String? localFolderId) {
@@ -698,8 +708,10 @@ class NotesScreenState extends State<NotesScreen> {
         ? _buildBreadcrumb(_selectedLocalFolderId!)
         : <Folder>[];
 
-    final boldStyle = AppTypography.captionMediumLight(color: Theme.of(context).colorScheme.onSurface);
-    final normalStyle = AppTypography.captionMediumLight(color: Theme.of(context).colorScheme.primary);
+    final boldStyle = AppTypography.captionMediumLight(
+        color: Theme.of(context).colorScheme.onSurface);
+    final normalStyle = AppTypography.captionMediumLight(
+        color: Theme.of(context).colorScheme.primary);
 
     const chevronWidth = 18.0;
     const crumbPadding = 8.0;
@@ -722,7 +734,8 @@ class NotesScreenState extends State<NotesScreen> {
         final useFull = fullWidth <= constraints.maxWidth;
 
         final chips = <Widget>[];
-        chips.add(_breadcrumbCrumb('全部', boldStyle, onTap: () => selectFolder(null)));
+        chips.add(
+            _breadcrumbCrumb('全部', boldStyle, onTap: () => selectFolder(null)));
 
         if (path.isEmpty) {
           // nop
@@ -881,7 +894,8 @@ class NotesScreenState extends State<NotesScreen> {
                         return AnimatedListItem(
                           index: index,
                           child: Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.listItemGap),
+                            padding: const EdgeInsets.only(
+                                bottom: AppSpacing.listItemGap),
                             child: _buildFolderCard(folder),
                           ),
                         );
@@ -890,7 +904,8 @@ class NotesScreenState extends State<NotesScreen> {
                       return AnimatedListItem(
                         index: index,
                         child: Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.listItemGap),
+                          padding: const EdgeInsets.only(
+                              bottom: AppSpacing.listItemGap),
                           child: _buildNoteCard(note),
                         ),
                       );
@@ -914,7 +929,8 @@ class NotesScreenState extends State<NotesScreen> {
       },
       onLongPress: () {
         if (_longPressPosition == null) return;
-        final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+        final overlay =
+            Overlay.of(context).context.findRenderObject() as RenderBox;
         _showFolderItemMenu(
           folder,
           RelativeRect.fromRect(
@@ -960,7 +976,8 @@ class NotesScreenState extends State<NotesScreen> {
       },
       onLongPress: () async {
         if (_longPressPosition == null) return;
-        final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+        final overlay =
+            Overlay.of(context).context.findRenderObject() as RenderBox;
         final result = await showMenu<String>(
           context: context,
           position: RelativeRect.fromRect(
@@ -1031,7 +1048,8 @@ class NotesScreenState extends State<NotesScreen> {
                 children: [
                   if (thumbnail != null) _buildThumbnail(thumbnail),
                   if (note.syncStatus != 'synced')
-                    const Icon(Icons.cloud_off, size: 14, color: AppColors.tertiaryText),
+                    const Icon(Icons.cloud_off,
+                        size: 14, color: AppColors.tertiaryText),
                 ],
               ),
             ],

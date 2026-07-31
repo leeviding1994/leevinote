@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' hide Provider;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:leevinote/providers/note_editor_provider.dart';
 import 'package:leevinote/screens/home_screen.dart';
 import 'package:leevinote/screens/login_screen.dart';
 import 'package:leevinote/services/auth_service.dart';
@@ -61,6 +63,8 @@ void main() async {
   }
 
   final apiService = ApiService();
+  final localNoteService = LocalNoteService();
+  final localFolderService = LocalFolderService();
   final settings = SettingsService(apiService: apiService);
   await settings.ensureLoaded();
 
@@ -93,7 +97,21 @@ void main() async {
     return Container();
   };
 
-  runApp(LeevinoteApp(settings: settings, apiService: apiService));
+  runApp(
+    ProviderScope(
+      overrides: [
+        apiServiceProvider.overrideWithValue(apiService),
+        localNoteServiceProvider.overrideWithValue(localNoteService),
+        localFolderServiceProvider.overrideWithValue(localFolderService),
+      ],
+      child: LeevinoteApp(
+        settings: settings,
+        apiService: apiService,
+        localNoteService: localNoteService,
+        localFolderService: localFolderService,
+      ),
+    ),
+  );
 }
 
 class _WindowSizeListener extends WindowListener {
@@ -109,30 +127,59 @@ class _WindowSizeListener extends WindowListener {
 class LeevinoteApp extends StatelessWidget {
   final SettingsService settings;
   final ApiService apiService;
-  const LeevinoteApp({super.key, required this.settings, required this.apiService});
+  final LocalNoteService localNoteService;
+  final LocalFolderService localFolderService;
+
+  const LeevinoteApp({
+    super.key,
+    required this.settings,
+    required this.apiService,
+    required this.localNoteService,
+    required this.localFolderService,
+  });
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthService(onLogin: () async { await settings.syncFromServer(); })),
+        ChangeNotifierProvider(
+            create: (_) => AuthService(onLogin: () async {
+                  await settings.syncFromServer();
+                })),
         ChangeNotifierProvider.value(value: settings),
         Provider(create: (_) => ApiService()),
-        ChangeNotifierProvider(create: (_) => LocalNoteService()),
-        ChangeNotifierProvider(create: (_) => LocalFolderService()),
+        ChangeNotifierProvider.value(value: localNoteService),
+        ChangeNotifierProvider.value(value: localFolderService),
         ChangeNotifierProvider(create: (_) => LocalAlarmService()),
         ChangeNotifierProvider(create: (_) => LocalMusicService()),
         ChangeNotifierProvider(create: (_) => LocalVideoService()),
         ChangeNotifierProvider(create: (_) => LocalScheduleService()),
         ChangeNotifierProvider(create: (_) => LocalTransactionService()),
-        ChangeNotifierProvider(create: (_) => LocalTransactionCategoryService()),
+        ChangeNotifierProvider(
+            create: (_) => LocalTransactionCategoryService()),
         ChangeNotifierProvider(create: (_) => HolidayService()),
-        ChangeNotifierProvider(create: (context) => AlarmService(context.read<ApiService>(), context.read<LocalAlarmService>(), holidayService: context.read<HolidayService>())),
-        ChangeNotifierProvider(create: (context) => MusicService(context.read<ApiService>(), context.read<LocalMusicService>())),
-        ChangeNotifierProvider(create: (context) => VideoService(context.read<ApiService>(), context.read<LocalVideoService>())),
-        ChangeNotifierProvider(create: (context) => ScheduleService(context.read<ApiService>(), context.read<LocalScheduleService>())),
-        ChangeNotifierProvider(create: (context) => TransactionService(context.read<ApiService>(), context.read<LocalTransactionService>(), categoryLocal: context.read<LocalTransactionCategoryService>())),
-        ChangeNotifierProvider(create: (context) => TransactionCategoryService(context.read<ApiService>(), context.read<LocalTransactionCategoryService>())),
+        ChangeNotifierProvider(
+            create: (context) => AlarmService(
+                context.read<ApiService>(), context.read<LocalAlarmService>(),
+                holidayService: context.read<HolidayService>())),
+        ChangeNotifierProvider(
+            create: (context) => MusicService(
+                context.read<ApiService>(), context.read<LocalMusicService>())),
+        ChangeNotifierProvider(
+            create: (context) => VideoService(
+                context.read<ApiService>(), context.read<LocalVideoService>())),
+        ChangeNotifierProvider(
+            create: (context) => ScheduleService(context.read<ApiService>(),
+                context.read<LocalScheduleService>())),
+        ChangeNotifierProvider(
+            create: (context) => TransactionService(context.read<ApiService>(),
+                context.read<LocalTransactionService>(),
+                categoryLocal:
+                    context.read<LocalTransactionCategoryService>())),
+        ChangeNotifierProvider(
+            create: (context) => TransactionCategoryService(
+                context.read<ApiService>(),
+                context.read<LocalTransactionCategoryService>())),
       ],
       child: _AuthCallbackSetter(
         apiService: apiService,
@@ -145,10 +192,10 @@ class LeevinoteApp extends StatelessWidget {
               theme: AppTheme.lightTheme(seedColor: settings.themeColor),
               darkTheme: AppTheme.darkTheme(seedColor: settings.themeColor),
               themeMode: settings.flutterThemeMode,
-            localizationsDelegates: const [
-              ...GlobalMaterialLocalizations.delegates,
-              FlutterQuillLocalizations.delegate,
-            ],
+              localizationsDelegates: const [
+                ...GlobalMaterialLocalizations.delegates,
+                FlutterQuillLocalizations.delegate,
+              ],
               supportedLocales: const [
                 Locale('zh', 'CN'),
                 Locale('en', 'US'),

@@ -40,13 +40,11 @@ class VideosScreenState extends State<VideosScreen> {
     if (!mounted) return;
     final success = await videoService.sync();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success ? '视频同步完成' : '同步失败'),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
-        ),
-      );
+      if (success) {
+        AppToast.success(context, '视频同步完成');
+      } else {
+        AppToast.error(context, '同步失败');
+      }
     }
   }
 
@@ -60,11 +58,6 @@ class VideosScreenState extends State<VideosScreen> {
           : videoService.videoList.isEmpty
               ? _buildEmptyState()
               : _buildVideoList(videoService),
-      floatingActionButton: AppFAB(
-        heroTag: 'videos_fab',
-        onPressed: _pickAndAddVideo,
-        icon: Icons.add,
-      ),
     );
   }
 
@@ -106,7 +99,8 @@ class VideosScreenState extends State<VideosScreen> {
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
             child: const Center(
-              child: Icon(Icons.play_circle_fill, color: Colors.white, size: 28),
+              child:
+                  Icon(Icons.play_circle_fill, color: Colors.white, size: 28),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -158,12 +152,25 @@ class VideosScreenState extends State<VideosScreen> {
     );
   }
 
+  Future<void> openAddVideo() {
+    return _pickAndAddVideo();
+  }
+
   Future<void> _pickAndAddVideo() async {
     final videoService = context.read<VideoService>();
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['mp4', 'avi', 'mov', 'mkv', 'wmv', 'flv', 'webm', 'm4v'],
+        allowedExtensions: [
+          'mp4',
+          'avi',
+          'mov',
+          'mkv',
+          'wmv',
+          'flv',
+          'webm',
+          'm4v'
+        ],
       );
 
       if (result == null || result.files.isEmpty) return;
@@ -243,7 +250,8 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
             children: [
               const Icon(Icons.error_outline, color: AppColors.error, size: 48),
               const SizedBox(height: AppSpacing.md),
-              Text('播放失败: $errorMessage', style: AppTypography.bodyLight(color: Colors.white)),
+              Text('播放失败: $errorMessage',
+                  style: AppTypography.bodyLight(color: Colors.white)),
             ],
           ),
         );

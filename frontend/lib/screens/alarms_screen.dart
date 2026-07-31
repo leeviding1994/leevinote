@@ -38,13 +38,11 @@ class AlarmsScreenState extends State<AlarmsScreen> {
     if (!mounted) return;
     final success = await alarmService.sync();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success ? '闹钟同步完成' : '同步失败'),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
-        ),
-      );
+      if (success) {
+        AppToast.success(context, '闹钟同步完成');
+      } else {
+        AppToast.error(context, '同步失败');
+      }
     }
   }
 
@@ -58,11 +56,6 @@ class AlarmsScreenState extends State<AlarmsScreen> {
           : alarmService.alarms.isEmpty
               ? _buildEmptyState()
               : _buildAlarmList(alarmService),
-      floatingActionButton: AppFAB(
-        heroTag: 'alarms_fab',
-        onPressed: () => _showAlarmEditor(context),
-        icon: Icons.add_alarm,
-      ),
     );
   }
 
@@ -157,11 +150,16 @@ class AlarmsScreenState extends State<AlarmsScreen> {
     });
   }
 
+  void openAddAlarm() {
+    _showAlarmEditor(context);
+  }
+
   void _showAlarmEditor(BuildContext context, {Alarm? alarm}) {
     final isEditing = alarm != null;
     final titleC = TextEditingController(text: isEditing ? alarm.title : '');
     int selectedHour = isEditing ? alarm.alarmTime.hour : TimeOfDay.now().hour;
-    int selectedMinute = isEditing ? alarm.alarmTime.minute : TimeOfDay.now().minute;
+    int selectedMinute =
+        isEditing ? alarm.alarmTime.minute : TimeOfDay.now().minute;
     String? repeatPattern = isEditing ? alarm.repeatPattern : null;
     final weekDays = isEditing ? List<int>.from(alarm.weekDays) : <int>[];
 
@@ -199,7 +197,8 @@ class AlarmsScreenState extends State<AlarmsScreen> {
                         if (isEditing) ...[
                           Row(
                             children: [
-                              Text('当前类型：', style: AppTypography.captionLight()),
+                              Text('当前类型：',
+                                  style: AppTypography.captionLight()),
                               Text(
                                 repeatPattern ?? '单次',
                                 style: AppTypography.captionMediumLight(
@@ -218,15 +217,19 @@ class AlarmsScreenState extends State<AlarmsScreen> {
                                 child: _buildTimeWheel(
                                   count: 24,
                                   selected: selectedHour,
-                                  onChanged: (v) => setSheetState(() => selectedHour = v),
+                                  onChanged: (v) =>
+                                      setSheetState(() => selectedHour = v),
                                 ),
                               ),
-                              Text(':', style: AppTypography.h2Light(color: AppColors.secondaryText)),
+                              Text(':',
+                                  style: AppTypography.h2Light(
+                                      color: AppColors.secondaryText)),
                               Expanded(
                                 child: _buildTimeWheel(
                                   count: 60,
                                   selected: selectedMinute,
-                                  onChanged: (v) => setSheetState(() => selectedMinute = v),
+                                  onChanged: (v) =>
+                                      setSheetState(() => selectedMinute = v),
                                 ),
                               ),
                             ],
@@ -243,7 +246,8 @@ class AlarmsScreenState extends State<AlarmsScreen> {
                             return AppChip(
                               label: type,
                               selected: selected,
-                              onSelected: (_) => setSheetState(() => repeatPattern = type),
+                              onSelected: (_) =>
+                                  setSheetState(() => repeatPattern = type),
                             );
                           }).toList(),
                         ),
@@ -256,7 +260,15 @@ class AlarmsScreenState extends State<AlarmsScreen> {
                               children: [
                                 for (int i = 1; i <= 7; i++)
                                   AppChip(
-                                    label: {1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五', 6: '周六', 7: '周日'}[i]!,
+                                    label: {
+                                      1: '周一',
+                                      2: '周二',
+                                      3: '周三',
+                                      4: '周四',
+                                      5: '周五',
+                                      6: '周六',
+                                      7: '周日'
+                                    }[i]!,
                                     selected: weekDays.contains(i),
                                     onSelected: (selected) {
                                       setSheetState(() {

@@ -79,7 +79,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       transactions = transactions.where((t) => t.type == _filterType).toList();
     }
     if (_filterLocalCategoryId != null) {
-      transactions = transactions.where((t) => t.localCategoryId == _filterLocalCategoryId).toList();
+      transactions = transactions
+          .where((t) => t.localCategoryId == _filterLocalCategoryId)
+          .toList();
     }
 
     if (_sortBy == 'amount_desc') {
@@ -87,7 +89,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     } else if (_sortBy == 'amount_asc') {
       transactions.sort((a, b) => a.amount.compareTo(b.amount));
     } else if (_sortBy == 'date_asc') {
-      transactions.sort((a, b) => a.transactionDate.compareTo(b.transactionDate));
+      transactions
+          .sort((a, b) => a.transactionDate.compareTo(b.transactionDate));
     }
 
     setState(() {
@@ -99,8 +102,11 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   List<Transaction> _getTransactionsForRange(DateTime start, DateTime end) {
     final localService = context.read<LocalTransactionService>();
     return localService.transactions.where((t) {
-      final date = DateTime(t.transactionDate.year, t.transactionDate.month, t.transactionDate.day);
-      return !date.isBefore(start) && !date.isAfter(end) && t.syncStatus != 'deleted';
+      final date = DateTime(t.transactionDate.year, t.transactionDate.month,
+          t.transactionDate.day);
+      return !date.isBefore(start) &&
+          !date.isAfter(end) &&
+          t.syncStatus != 'deleted';
     }).toList();
   }
 
@@ -109,7 +115,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       case _TransactionView.day:
       case _TransactionView.month:
         final start = DateTime(_focusedDate.year, _focusedDate.month, 1);
-        final end = DateTime(_focusedDate.year, _focusedDate.month + 1, 0, 23, 59, 59);
+        final end =
+            DateTime(_focusedDate.year, _focusedDate.month + 1, 0, 23, 59, 59);
         return (start, end);
       case _TransactionView.year:
         final start = DateTime(_focusedDate.year, 1, 1);
@@ -206,29 +213,23 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
     setState(() => _loading = true);
     try {
-      final categoriesSynced = await TransactionCategoryService(api, localCat).syncCategories();
+      final categoriesSynced =
+          await TransactionCategoryService(api, localCat).syncCategories();
       final transactionsSynced = categoriesSynced
-          ? await TransactionService(api, localTx, categoryLocal: localCat).syncTransactions()
+          ? await TransactionService(api, localTx, categoryLocal: localCat)
+              .syncTransactions()
           : false;
       await _refreshData();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(categoriesSynced && transactionsSynced ? '同步完成' : '同步失败，请检查网络或登录状态'),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
-          ),
-        );
+        if (categoriesSynced && transactionsSynced) {
+          AppToast.success(context, '同步完成');
+        } else {
+          AppToast.error(context, '同步失败，请检查网络或登录状态');
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('同步失败: $e'),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
-          ),
-        );
+        AppToast.error(context, '同步失败: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -251,8 +252,10 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
-            final expenseCategories = _categories.where((c) => c.type == 'expense').toList();
-            final incomeCategories = _categories.where((c) => c.type == 'income').toList();
+            final expenseCategories =
+                _categories.where((c) => c.type == 'expense').toList();
+            final incomeCategories =
+                _categories.where((c) => c.type == 'income').toList();
 
             return SafeArea(
               child: Padding(
@@ -275,7 +278,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                             label: '重置',
                             width: null,
                             height: 36,
-                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md),
                             onPressed: () => setSheetState(() {
                               _filterType = null;
                               _filterLocalCategoryId = null;
@@ -294,7 +298,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                           AppChip(
                             label: '全部',
                             selected: _filterType == null,
-                            onSelected: (_) => setSheetState(() => _filterType = null),
+                            onSelected: (_) =>
+                                setSheetState(() => _filterType = null),
                           ),
                           AppChip(
                             label: '支出',
@@ -321,14 +326,17 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                         Wrap(
                           spacing: AppSpacing.md,
                           runSpacing: AppSpacing.md,
-                          children: expenseCategories.map((c) => AppChip(
-                            label: c.name,
-                            selected: _filterLocalCategoryId == c.localId,
-                            onSelected: (_) => setSheetState(() {
-                              _filterLocalCategoryId = c.localId;
-                              _filterType = 'expense';
-                            }),
-                          )).toList(),
+                          children: expenseCategories
+                              .map((c) => AppChip(
+                                    label: c.name,
+                                    selected:
+                                        _filterLocalCategoryId == c.localId,
+                                    onSelected: (_) => setSheetState(() {
+                                      _filterLocalCategoryId = c.localId;
+                                      _filterType = 'expense';
+                                    }),
+                                  ))
+                              .toList(),
                         ),
                         const SizedBox(height: AppSpacing.md),
                       ],
@@ -338,14 +346,17 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                         Wrap(
                           spacing: AppSpacing.md,
                           runSpacing: AppSpacing.md,
-                          children: incomeCategories.map((c) => AppChip(
-                            label: c.name,
-                            selected: _filterLocalCategoryId == c.localId,
-                            onSelected: (_) => setSheetState(() {
-                              _filterLocalCategoryId = c.localId;
-                              _filterType = 'income';
-                            }),
-                          )).toList(),
+                          children: incomeCategories
+                              .map((c) => AppChip(
+                                    label: c.name,
+                                    selected:
+                                        _filterLocalCategoryId == c.localId,
+                                    onSelected: (_) => setSheetState(() {
+                                      _filterLocalCategoryId = c.localId;
+                                      _filterType = 'income';
+                                    }),
+                                  ))
+                              .toList(),
                         ),
                         const SizedBox(height: AppSpacing.lg),
                       ],
@@ -358,22 +369,26 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                           AppChip(
                             label: '时间倒序',
                             selected: _sortBy == 'date_desc',
-                            onSelected: (_) => setSheetState(() => _sortBy = 'date_desc'),
+                            onSelected: (_) =>
+                                setSheetState(() => _sortBy = 'date_desc'),
                           ),
                           AppChip(
                             label: '时间正序',
                             selected: _sortBy == 'date_asc',
-                            onSelected: (_) => setSheetState(() => _sortBy = 'date_asc'),
+                            onSelected: (_) =>
+                                setSheetState(() => _sortBy = 'date_asc'),
                           ),
                           AppChip(
                             label: '金额从高到低',
                             selected: _sortBy == 'amount_desc',
-                            onSelected: (_) => setSheetState(() => _sortBy = 'amount_desc'),
+                            onSelected: (_) =>
+                                setSheetState(() => _sortBy = 'amount_desc'),
                           ),
                           AppChip(
                             label: '金额从低到高',
                             selected: _sortBy == 'amount_asc',
-                            onSelected: (_) => setSheetState(() => _sortBy = 'amount_asc'),
+                            onSelected: (_) =>
+                                setSheetState(() => _sortBy = 'amount_asc'),
                           ),
                         ],
                       ),
@@ -466,9 +481,11 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildHeroStat('收入', '+¥ ${_amountFormat.format(income)}', Colors.white),
+              _buildHeroStat(
+                  '收入', '+¥ ${_amountFormat.format(income)}', Colors.white),
               _buildHeroDivider(),
-              _buildHeroStat('支出', '-¥ ${_amountFormat.format(expense)}', Colors.white),
+              _buildHeroStat(
+                  '支出', '-¥ ${_amountFormat.format(expense)}', Colors.white),
             ],
           ),
         ],
@@ -545,7 +562,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildActionsBar() {
-    final hasFilter = _filterType != null || _filterLocalCategoryId != null || _sortBy != 'date_desc';
+    final hasFilter = _filterType != null ||
+        _filterLocalCategoryId != null ||
+        _sortBy != 'date_desc';
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.pageHorizontal,
@@ -589,7 +608,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
     final grouped = <String, List<Transaction>>{};
     for (final t in _transactions) {
-      final key = '${t.transactionDate.year}-${t.transactionDate.month.toString().padLeft(2, '0')}-${t.transactionDate.day.toString().padLeft(2, '0')}';
+      final key =
+          '${t.transactionDate.year}-${t.transactionDate.month.toString().padLeft(2, '0')}-${t.transactionDate.day.toString().padLeft(2, '0')}';
       grouped.putIfAbsent(key, () => []).add(t);
     }
     final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
@@ -660,11 +680,14 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildHeroStat('收入', '+¥ ${_amountFormat.format(income)}', Colors.white),
+              _buildHeroStat(
+                  '收入', '+¥ ${_amountFormat.format(income)}', Colors.white),
               _buildHeroDivider(),
-              _buildHeroStat('支出', '-¥ ${_amountFormat.format(expense)}', Colors.white),
+              _buildHeroStat(
+                  '支出', '-¥ ${_amountFormat.format(expense)}', Colors.white),
               _buildHeroDivider(),
-              _buildHeroStat('结余率', '${(savingsRate * 100).toStringAsFixed(1)}%', Colors.white),
+              _buildHeroStat('结余率',
+                  '${(savingsRate * 100).toStringAsFixed(1)}%', Colors.white),
             ],
           ),
         ],
@@ -686,7 +709,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
-        Text(label, style: AppTypography.smallLight(color: color.withValues(alpha: 0.7))),
+        Text(label,
+            style:
+                AppTypography.smallLight(color: color.withValues(alpha: 0.7))),
       ],
     );
   }
@@ -718,7 +743,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       padding: const EdgeInsets.only(bottom: 88),
       child: Column(
         children: [
-          _buildMonthSavingsRingCard(income: income, expense: expense, savingsRate: savingsRate),
+          _buildMonthSavingsRingCard(
+              income: income, expense: expense, savingsRate: savingsRate),
           const SizedBox(height: AppSpacing.component),
           _buildExpenseCategoryCard(transactions),
           const SizedBox(height: AppSpacing.component),
@@ -736,11 +762,15 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     required double expense,
     required double savingsRate,
   }) {
-    final daysInMonth = DateTime(_focusedDate.year, _focusedDate.month + 1, 0).day;
+    final daysInMonth =
+        DateTime(_focusedDate.year, _focusedDate.month + 1, 0).day;
     final now = DateTime.now();
-    final remainingDays = (_focusedDate.year == now.year && _focusedDate.month == now.month)
-        ? daysInMonth - now.day
-        : (_focusedDate.isAfter(DateTime(now.year, now.month)) ? daysInMonth : 0);
+    final remainingDays =
+        (_focusedDate.year == now.year && _focusedDate.month == now.month)
+            ? daysInMonth - now.day
+            : (_focusedDate.isAfter(DateTime(now.year, now.month))
+                ? daysInMonth
+                : 0);
 
     final savingsValue = savingsRate * 100;
     final expenseValue = 100 - savingsValue;
@@ -821,16 +851,19 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     );
   }
 
-  Widget _buildExpenseCategoryCard(List<Transaction> transactions, {String title = '支出分类'}) {
+  Widget _buildExpenseCategoryCard(List<Transaction> transactions,
+      {String title = '支出分类'}) {
     final ranking = _groupExpensesByCategory(transactions);
     if (ranking.isEmpty) {
       return _buildSectionCard(
         child: const SizedBox(height: 80, child: Center(child: Text('暂无支出数据'))),
       );
     }
-    final total = ranking.fold<double>(0.0, (sum, e) => sum + (e['amount'] as double));
+    final total =
+        ranking.fold<double>(0.0, (sum, e) => sum + (e['amount'] as double));
     final hasMore = ranking.length > 5;
-    final displayItems = _showAllExpenseCategories ? ranking : ranking.take(5).toList();
+    final displayItems =
+        _showAllExpenseCategories ? ranking : ranking.take(5).toList();
 
     return _buildSectionCard(
       child: Column(
@@ -840,7 +873,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(title, style: AppTypography.h3Light()),
-              Text('总支出 -¥ ${_amountFormat.format(total)}', style: AppTypography.smallLight()),
+              Text('总支出 -¥ ${_amountFormat.format(total)}',
+                  style: AppTypography.smallLight()),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -849,7 +883,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             final item = entry.value;
             final category = item['category'] as TransactionCategory?;
             final amount = item['amount'] as double;
-            final color = _parseColor(category?.color) ?? _defaultCategoryColor(index);
+            final color =
+                _parseColor(category?.color) ?? _defaultCategoryColor(index);
             return _buildCategoryRankingRow(
               category: category,
               amount: amount,
@@ -861,7 +896,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             Center(
               child: AppButton.secondary(
                 label: _showAllExpenseCategories ? '收起' : '更多',
-                onPressed: () => setState(() => _showAllExpenseCategories = !_showAllExpenseCategories),
+                onPressed: () => setState(() =>
+                    _showAllExpenseCategories = !_showAllExpenseCategories),
               ),
             ),
         ],
@@ -897,10 +933,12 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(category?.name ?? '未分类', style: AppTypography.bodyLight()),
+                    Text(category?.name ?? '未分类',
+                        style: AppTypography.bodyLight()),
                     Text(
                       '-${_amountFormat.format(amount)}',
-                      style: AppTypography.bodyMediumLight(color: AppColors.error),
+                      style:
+                          AppTypography.bodyMediumLight(color: AppColors.error),
                     ),
                   ],
                 ),
@@ -923,7 +961,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildMonthTrendCard(List<Transaction> transactions) {
-    final daysInMonth = DateTime(_focusedDate.year, _focusedDate.month + 1, 0).day;
+    final daysInMonth =
+        DateTime(_focusedDate.year, _focusedDate.month + 1, 0).day;
     final dailyExpense = List<double>.filled(daysInMonth, 0);
     final dailyIncome = List<double>.filled(daysInMonth, 0);
 
@@ -961,7 +1000,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                       interval: maxY / 4,
                       getTitlesWidget: (value, meta) {
                         if (value == 0) return const SizedBox.shrink();
-                        return Text('¥${value.toInt()}', style: AppTypography.smallLight());
+                        return Text('¥${value.toInt()}',
+                            style: AppTypography.smallLight());
                       },
                     ),
                   ),
@@ -971,13 +1011,17 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                       interval: (daysInMonth ~/ 5).toDouble(),
                       getTitlesWidget: (value, meta) {
                         final day = value.toInt() + 1;
-                        if (day < 1 || day > daysInMonth) return const SizedBox.shrink();
+                        if (day < 1 || day > daysInMonth) {
+                          return const SizedBox.shrink();
+                        }
                         return Text('$day日', style: AppTypography.smallLight());
                       },
                     ),
                   ),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                 ),
                 borderData: FlBorderData(show: false),
                 lineBarsData: [
@@ -1010,7 +1054,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                                 height: 1.2,
                               ),
                             ),
-                            TextSpan(text: '$label  ¥${spot.y.toStringAsFixed(0)}'),
+                            TextSpan(
+                                text: '$label  ¥${spot.y.toStringAsFixed(0)}'),
                           ],
                         );
                       }).toList();
@@ -1035,28 +1080,39 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildMaxTransactionCards(List<Transaction> transactions) {
-    final incomeTransactions = transactions.where((t) => t.type == 'income').toList();
-    final expenseTransactions = transactions.where((t) => t.type == 'expense').toList();
+    final incomeTransactions =
+        transactions.where((t) => t.type == 'income').toList();
+    final expenseTransactions =
+        transactions.where((t) => t.type == 'expense').toList();
     incomeTransactions.sort((a, b) => b.amount.compareTo(a.amount));
     expenseTransactions.sort((a, b) => b.amount.compareTo(a.amount));
-    final maxIncome = incomeTransactions.isNotEmpty ? incomeTransactions.first : null;
-    final maxExpense = expenseTransactions.isNotEmpty ? expenseTransactions.first : null;
+    final maxIncome =
+        incomeTransactions.isNotEmpty ? incomeTransactions.first : null;
+    final maxExpense =
+        expenseTransactions.isNotEmpty ? expenseTransactions.first : null;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+      padding:
+          const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
       child: Row(
         children: [
           if (maxIncome != null)
-            Expanded(child: _buildMaxTransactionCard('最大单笔收入', maxIncome, AppColors.success)),
-          if (maxIncome != null && maxExpense != null) const SizedBox(width: AppSpacing.md),
+            Expanded(
+                child: _buildMaxTransactionCard(
+                    '最大单笔收入', maxIncome, AppColors.success)),
+          if (maxIncome != null && maxExpense != null)
+            const SizedBox(width: AppSpacing.md),
           if (maxExpense != null)
-            Expanded(child: _buildMaxTransactionCard('最大单笔支出', maxExpense, AppColors.error)),
+            Expanded(
+                child: _buildMaxTransactionCard(
+                    '最大单笔支出', maxExpense, AppColors.error)),
         ],
       ),
     );
   }
 
-  Widget _buildMaxTransactionCard(String title, Transaction t, Color amountColor) {
+  Widget _buildMaxTransactionCard(
+      String title, Transaction t, Color amountColor) {
     final category = _getCategory(t.localCategoryId);
     final catColor = _parseColor(category?.color) ?? AppColors.secondaryText;
 
@@ -1078,7 +1134,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     color: catColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
-                  child: Icon(_parseIcon(category?.icon), color: catColor, size: 20),
+                  child: Icon(_parseIcon(category?.icon),
+                      color: catColor, size: 20),
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -1137,7 +1194,10 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       padding: const EdgeInsets.only(bottom: 88),
       child: Column(
         children: [
-          _buildYearOverviewCard(monthCount: monthCount, avgExpense: avgExpense, avgBalance: avgBalance),
+          _buildYearOverviewCard(
+              monthCount: monthCount,
+              avgExpense: avgExpense,
+              avgBalance: avgBalance),
           const SizedBox(height: AppSpacing.component),
           _buildYearMonthListCard(transactions),
           const SizedBox(height: AppSpacing.component),
@@ -1169,7 +1229,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 child: _buildOverviewStatItem('有记录月份', '$monthCount个月'),
               ),
               Expanded(
-                child: _buildOverviewStatItem('月均支出', '-¥ ${_amountFormat.format(avgExpense)}'),
+                child: _buildOverviewStatItem(
+                    '月均支出', '-¥ ${_amountFormat.format(avgExpense)}'),
               ),
               Expanded(
                 child: _buildOverviewStatItem(
@@ -1201,13 +1262,16 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildYearMonthListCard(List<Transaction> transactions) {
-    final monthlyData = List<Map<String, double>>.generate(12, (_) => {'income': 0.0, 'expense': 0.0});
+    final monthlyData = List<Map<String, double>>.generate(
+        12, (_) => {'income': 0.0, 'expense': 0.0});
     for (final t in transactions) {
       final month = t.transactionDate.month - 1;
       if (t.type == 'income') {
-        monthlyData[month]['income'] = (monthlyData[month]['income'] ?? 0.0) + t.amount;
+        monthlyData[month]['income'] =
+            (monthlyData[month]['income'] ?? 0.0) + t.amount;
       } else {
-        monthlyData[month]['expense'] = (monthlyData[month]['expense'] ?? 0.0) + t.amount;
+        monthlyData[month]['expense'] =
+            (monthlyData[month]['expense'] ?? 0.0) + t.amount;
       }
     }
 
@@ -1236,7 +1300,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 children: [
                   SizedBox(
                     width: 40,
-                    child: Text('${index + 1}月', style: AppTypography.bodyLight()),
+                    child:
+                        Text('${index + 1}月', style: AppTypography.bodyLight()),
                   ),
                   if (hasData) ...[
                     Container(
@@ -1252,7 +1317,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     const SizedBox(width: 32),
                   Expanded(
                     child: Text(
-                      hasData ? '${isPositive ? '+' : '-'}¥ ${_amountFormat.format(balance.abs())}' : '--',
+                      hasData
+                          ? '${isPositive ? '+' : '-'}¥ ${_amountFormat.format(balance.abs())}'
+                          : '--',
                       style: AppTypography.bodyMediumLight(
                         color: hasData
                             ? (isPositive ? AppColors.success : AppColors.error)
@@ -1276,7 +1343,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
         child: const SizedBox(height: 80, child: Center(child: Text('暂无收入数据'))),
       );
     }
-    final total = ranking.fold<double>(0.0, (sum, e) => sum + (e['amount'] as double));
+    final total =
+        ranking.fold<double>(0.0, (sum, e) => sum + (e['amount'] as double));
 
     return _buildSectionCard(
       child: Column(
@@ -1286,7 +1354,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('收入来源', style: AppTypography.h3Light()),
-              Text('总收入 +¥ ${_amountFormat.format(total)}', style: AppTypography.smallLight()),
+              Text('总收入 +¥ ${_amountFormat.format(total)}',
+                  style: AppTypography.smallLight()),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -1295,7 +1364,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             final item = entry.value;
             final category = item['category'] as TransactionCategory?;
             final amount = item['amount'] as double;
-            final color = _parseColor(category?.color) ?? _defaultCategoryColor(index);
+            final color =
+                _parseColor(category?.color) ?? _defaultCategoryColor(index);
             return _buildIncomeRankingRow(
               category: category,
               amount: amount,
@@ -1336,10 +1406,12 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(category?.name ?? '未分类', style: AppTypography.bodyLight()),
+                    Text(category?.name ?? '未分类',
+                        style: AppTypography.bodyLight()),
                     Text(
                       '+¥ ${_amountFormat.format(amount)}',
-                      style: AppTypography.bodyMediumLight(color: AppColors.success),
+                      style: AppTypography.bodyMediumLight(
+                          color: AppColors.success),
                     ),
                   ],
                 ),
@@ -1362,17 +1434,22 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildYearTrendCard(List<Transaction> transactions) {
-    final monthlyData = List<Map<String, double>>.generate(12, (_) => {'income': 0.0, 'expense': 0.0});
+    final monthlyData = List<Map<String, double>>.generate(
+        12, (_) => {'income': 0.0, 'expense': 0.0});
     for (final t in transactions) {
       final month = t.transactionDate.month - 1;
       if (t.type == 'income') {
-        monthlyData[month]['income'] = (monthlyData[month]['income'] ?? 0.0) + t.amount;
+        monthlyData[month]['income'] =
+            (monthlyData[month]['income'] ?? 0.0) + t.amount;
       } else {
-        monthlyData[month]['expense'] = (monthlyData[month]['expense'] ?? 0.0) + t.amount;
+        monthlyData[month]['expense'] =
+            (monthlyData[month]['expense'] ?? 0.0) + t.amount;
       }
     }
 
-    final maxY = _findMax([...monthlyData.expand((e) => [e['income']!, e['expense']!])]);
+    final maxY = _findMax([
+      ...monthlyData.expand((e) => [e['income']!, e['expense']!])
+    ]);
     if (maxY <= 0) return const SizedBox.shrink();
 
     return _buildSectionCard(
@@ -1393,14 +1470,20 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
                         final month = value.toInt() + 1;
-                        if (month < 1 || month > 12) return const SizedBox.shrink();
-                        return Text('$month月', style: AppTypography.smallLight());
+                        if (month < 1 || month > 12) {
+                          return const SizedBox.shrink();
+                        }
+                        return Text('$month月',
+                            style: AppTypography.smallLight());
                       },
                     ),
                   ),
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                 ),
                 borderData: FlBorderData(show: false),
                 barGroups: List.generate(12, (index) {
@@ -1410,8 +1493,16 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     x: index,
                     barsSpace: 1,
                     barRods: [
-                      BarChartRodData(toY: income, color: AppColors.success, width: 4, borderRadius: BorderRadius.circular(AppRadius.xs)),
-                      BarChartRodData(toY: expense, color: AppColors.error, width: 4, borderRadius: BorderRadius.circular(AppRadius.xs)),
+                      BarChartRodData(
+                          toY: income,
+                          color: AppColors.success,
+                          width: 4,
+                          borderRadius: BorderRadius.circular(AppRadius.xs)),
+                      BarChartRodData(
+                          toY: expense,
+                          color: AppColors.error,
+                          width: 4,
+                          borderRadius: BorderRadius.circular(AppRadius.xs)),
                     ],
                   );
                 }),
@@ -1438,7 +1529,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                               height: 1.2,
                             ),
                           ),
-                          TextSpan(text: '$label  ¥${rod.toY.toStringAsFixed(0)}'),
+                          TextSpan(
+                              text: '$label  ¥${rod.toY.toStringAsFixed(0)}'),
                         ],
                       );
                     },
@@ -1469,21 +1561,25 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     return months.length;
   }
 
-  List<Map<String, dynamic>> _groupIncomesByCategory(List<Transaction> transactions) {
+  List<Map<String, dynamic>> _groupIncomesByCategory(
+      List<Transaction> transactions) {
     final map = <String, Map<String, dynamic>>{};
     for (final t in transactions) {
       if (t.type != 'income') continue;
       final category = _getCategory(t.localCategoryId);
       final key = category?.localId ?? '_uncategorized';
-      final entry = map.putIfAbsent(key, () => {
-        'category': category,
-        'name': category?.name ?? '未分类',
-        'amount': 0.0,
-      });
+      final entry = map.putIfAbsent(
+          key,
+          () => {
+                'category': category,
+                'name': category?.name ?? '未分类',
+                'amount': 0.0,
+              });
       entry['amount'] = (entry['amount'] as double) + t.amount;
     }
     final result = map.values.toList();
-    result.sort((a, b) => (b['amount'] as double).compareTo(a['amount'] as double));
+    result.sort(
+        (a, b) => (b['amount'] as double).compareTo(a['amount'] as double));
     return result;
   }
 
@@ -1498,18 +1594,21 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
   LineChartBarData _buildSmoothLine(List<double> data, Color color) {
     return LineChartBarData(
-      spots: List.generate(data.length, (index) => FlSpot(index.toDouble(), data[index])),
+      spots: List.generate(
+          data.length, (index) => FlSpot(index.toDouble(), data[index])),
       color: color,
       barWidth: 2,
       isCurved: true,
       dotData: const FlDotData(show: false),
-      belowBarData: BarAreaData(show: true, color: color.withValues(alpha: 0.1)),
+      belowBarData:
+          BarAreaData(show: true, color: color.withValues(alpha: 0.1)),
     );
   }
 
   Widget _buildLegendItem(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 4),
+      padding:
+          const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1532,21 +1631,25 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     );
   }
 
-  List<Map<String, dynamic>> _groupExpensesByCategory(List<Transaction> transactions) {
+  List<Map<String, dynamic>> _groupExpensesByCategory(
+      List<Transaction> transactions) {
     final map = <String, Map<String, dynamic>>{};
     for (final t in transactions) {
       if (t.type != 'expense') continue;
       final category = _getCategory(t.localCategoryId);
       final key = category?.localId ?? '_uncategorized';
-      final entry = map.putIfAbsent(key, () => {
-        'category': category,
-        'name': category?.name ?? '未分类',
-        'amount': 0.0,
-      });
+      final entry = map.putIfAbsent(
+          key,
+          () => {
+                'category': category,
+                'name': category?.name ?? '未分类',
+                'amount': 0.0,
+              });
       entry['amount'] = (entry['amount'] as double) + t.amount;
     }
     final result = map.values.toList();
-    result.sort((a, b) => (b['amount'] as double).compareTo(a['amount'] as double));
+    result.sort(
+        (a, b) => (b['amount'] as double).compareTo(a['amount'] as double));
     return result;
   }
 
@@ -1574,8 +1677,12 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildDayHeader(DateTime date, List<Transaction> items) {
-    final dailyIncome = items.where((t) => t.type == 'income').fold(0.0, (sum, t) => sum + t.amount);
-    final dailyExpense = items.where((t) => t.type == 'expense').fold(0.0, (sum, t) => sum + t.amount);
+    final dailyIncome = items
+        .where((t) => t.type == 'income')
+        .fold(0.0, (sum, t) => sum + t.amount);
+    final dailyExpense = items
+        .where((t) => t.type == 'expense')
+        .fold(0.0, (sum, t) => sum + t.amount);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -1605,7 +1712,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     final children = <InlineSpan>[];
     if (income > 0) {
       children.addAll([
-        TextSpan(text: '收 ', style: AppTypography.smallLight(color: AppColors.success)),
+        TextSpan(
+            text: '收 ',
+            style: AppTypography.smallLight(color: AppColors.success)),
         TextSpan(
           text: '+${_summaryFormat.format(income)}',
           style: AppTypography.smallMediumLight(color: AppColors.success),
@@ -1617,7 +1726,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     }
     if (expense > 0) {
       children.addAll([
-        TextSpan(text: '支 ', style: AppTypography.smallLight(color: AppColors.error)),
+        TextSpan(
+            text: '支 ',
+            style: AppTypography.smallLight(color: AppColors.error)),
         TextSpan(
           text: '-${_summaryFormat.format(expense)}',
           style: AppTypography.smallMediumLight(color: AppColors.error),
@@ -1703,7 +1814,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     textAlign: TextAlign.right,
                   ),
                   if (t.syncStatus != 'synced')
-                    const Icon(Icons.cloud_off, size: 12, color: AppColors.tertiaryText),
+                    const Icon(Icons.cloud_off,
+                        size: 12, color: AppColors.tertiaryText),
                 ],
               ),
             ),
@@ -1724,17 +1836,28 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
   IconData _parseIcon(String? iconName) {
     switch (iconName) {
-      case 'food': return Icons.restaurant;
-      case 'transport': return Icons.directions_car;
-      case 'shopping': return Icons.shopping_bag;
-      case 'entertainment': return Icons.movie;
-      case 'housing': return Icons.home;
-      case 'medical': return Icons.local_hospital;
-      case 'education': return Icons.school;
-      case 'salary': return Icons.account_balance_wallet;
-      case 'bonus': return Icons.card_giftcard;
-      case 'investment': return Icons.trending_up;
-      default: return Icons.label;
+      case 'food':
+        return Icons.restaurant;
+      case 'transport':
+        return Icons.directions_car;
+      case 'shopping':
+        return Icons.shopping_bag;
+      case 'entertainment':
+        return Icons.movie;
+      case 'housing':
+        return Icons.home;
+      case 'medical':
+        return Icons.local_hospital;
+      case 'education':
+        return Icons.school;
+      case 'salary':
+        return Icons.account_balance_wallet;
+      case 'bonus':
+        return Icons.card_giftcard;
+      case 'investment':
+        return Icons.trending_up;
+      default:
+        return Icons.label;
     }
   }
 }

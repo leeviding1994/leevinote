@@ -37,13 +37,11 @@ class MusicScreenState extends State<MusicScreen> {
     if (!mounted) return;
     final success = await musicService.sync();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success ? '音乐同步完成' : '同步失败'),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 88),
-        ),
-      );
+      if (success) {
+        AppToast.success(context, '音乐同步完成');
+      } else {
+        AppToast.error(context, '同步失败');
+      }
     }
   }
 
@@ -57,11 +55,6 @@ class MusicScreenState extends State<MusicScreen> {
           : musicService.musicList.isEmpty
               ? _buildEmptyState()
               : _buildMusicList(musicService),
-      floatingActionButton: AppFAB(
-        heroTag: 'music_fab',
-        onPressed: _pickAndAddMusic,
-        icon: Icons.add,
-      ),
     );
   }
 
@@ -85,7 +78,8 @@ class MusicScreenState extends State<MusicScreen> {
               return AnimatedListItem(
                 index: index,
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.listItemGap),
+                  padding:
+                      const EdgeInsets.only(bottom: AppSpacing.listItemGap),
                   child: _buildMusicCard(music, service),
                 ),
               );
@@ -116,7 +110,9 @@ class MusicScreenState extends State<MusicScreen> {
             ),
             child: Icon(
               isCurrent && service.playing ? Icons.pause : Icons.music_note,
-              color: isCurrent ? Theme.of(context).colorScheme.primary : AppColors.tertiaryText,
+              color: isCurrent
+                  ? Theme.of(context).colorScheme.primary
+                  : AppColors.tertiaryText,
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -127,7 +123,9 @@ class MusicScreenState extends State<MusicScreen> {
                 Text(
                   music.title,
                   style: AppTypography.bodyMediumLight(
-                    color: isCurrent ? Theme.of(context).colorScheme.primary : null,
+                    color: isCurrent
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -181,7 +179,8 @@ class MusicScreenState extends State<MusicScreen> {
       ),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
         boxShadow: AppShadows.light,
       ),
       child: Column(
@@ -198,7 +197,8 @@ class MusicScreenState extends State<MusicScreen> {
                 ? pos.inMilliseconds / dur.inMilliseconds
                 : 0.0,
             onChanged: (v) {
-              final newPos = Duration(milliseconds: (v * dur.inMilliseconds).round());
+              final newPos =
+                  Duration(milliseconds: (v * dur.inMilliseconds).round());
               service.seek(newPos);
             },
             activeColor: Theme.of(context).colorScheme.primary,
@@ -209,8 +209,10 @@ class MusicScreenState extends State<MusicScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(_formatDuration(pos), style: AppTypography.smallMediumLight()),
-                Text(_formatDuration(dur), style: AppTypography.smallMediumLight()),
+                Text(_formatDuration(pos),
+                    style: AppTypography.smallMediumLight()),
+                Text(_formatDuration(dur),
+                    style: AppTypography.smallMediumLight()),
               ],
             ),
           ),
@@ -224,7 +226,9 @@ class MusicScreenState extends State<MusicScreen> {
               const SizedBox(width: AppSpacing.lg),
               AppIconButton(
                 iconSize: 40,
-                icon: service.playing ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                icon: service.playing
+                    ? Icons.pause_circle_filled
+                    : Icons.play_circle_filled,
                 onPressed: () => service.play(track),
               ),
             ],
@@ -232,6 +236,10 @@ class MusicScreenState extends State<MusicScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> openAddMusic() {
+    return _pickAndAddMusic();
   }
 
   Future<void> _pickAndAddMusic() async {

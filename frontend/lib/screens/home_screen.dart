@@ -24,6 +24,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  String? _syncingModuleId;
   final _notesKey = GlobalKey<NotesScreenState>();
   final _alarmsKey = GlobalKey<AlarmsScreenState>();
   final _musicKey = GlobalKey<MusicScreenState>();
@@ -55,6 +56,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final selectedModuleId = ids.isNotEmpty ? ids[_currentIndex] : 'notes';
     final isNotes = selectedModuleId == 'notes';
+    final isAlarms = selectedModuleId == 'alarms';
+    final isMusic = selectedModuleId == 'music';
+    final isVideos = selectedModuleId == 'videos';
     final isSchedules = selectedModuleId == 'schedules';
     final isTransactions = selectedModuleId == 'transactions';
     final isProfile = selectedModuleId == 'profile';
@@ -70,21 +74,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final actions = <Widget>[
       if (isNotes)
-        AppIconButton(
-          icon: Icons.sync,
+        _SyncIconButton(
+          isSyncing: _syncingModuleId == 'notes',
           tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-          onPressed: () => _notesKey.currentState?.sync(),
+          onPressed: () =>
+              _runSync('notes', () => _notesKey.currentState?.sync()),
         ),
       if (isSchedules) ...[
         AppIconButton(
           icon: Icons.search,
           tooltip: '搜索日程',
-          onPressed: () => _schedulesKey.currentState?.toggleSearch(),
+          onPressed: () {
+            _schedulesKey.currentState?.toggleSearch();
+            setState(() {});
+          },
         ),
-        AppIconButton(
-          icon: Icons.sync,
+        _SyncIconButton(
+          isSyncing: _syncingModuleId == 'schedules',
           tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-          onPressed: () => _schedulesKey.currentState?.sync(),
+          onPressed: () =>
+              _runSync('schedules', () => _schedulesKey.currentState?.sync()),
         ),
       ],
       if (isProfile)
@@ -97,28 +106,34 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       if (selectedModuleId == 'alarms')
-        AppIconButton(
-          icon: Icons.sync,
+        _SyncIconButton(
+          isSyncing: _syncingModuleId == 'alarms',
           tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-          onPressed: () => _alarmsKey.currentState?.sync(),
+          onPressed: () =>
+              _runSync('alarms', () => _alarmsKey.currentState?.sync()),
         ),
       if (selectedModuleId == 'music')
-        AppIconButton(
-          icon: Icons.sync,
+        _SyncIconButton(
+          isSyncing: _syncingModuleId == 'music',
           tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-          onPressed: () => _musicKey.currentState?.sync(),
+          onPressed: () =>
+              _runSync('music', () => _musicKey.currentState?.sync()),
         ),
       if (selectedModuleId == 'videos')
-        AppIconButton(
-          icon: Icons.sync,
+        _SyncIconButton(
+          isSyncing: _syncingModuleId == 'videos',
           tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-          onPressed: () => _videosKey.currentState?.sync(),
+          onPressed: () =>
+              _runSync('videos', () => _videosKey.currentState?.sync()),
         ),
       if (selectedModuleId == 'transactions')
-        AppIconButton(
-          icon: Icons.sync,
+        _SyncIconButton(
+          isSyncing: _syncingModuleId == 'transactions',
           tooltip: auth.isAuthenticated ? '同步' : '登录并同步',
-          onPressed: () => _transactionsKey.currentState?.sync(),
+          onPressed: () => _runSync(
+            'transactions',
+            () => _transactionsKey.currentState?.sync(),
+          ),
         ),
     ];
 
@@ -147,40 +162,150 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: isNotes
           ? AppFAB(
               heroTag: 'notes_fab',
-              onPressed: () => _notesKey.currentState?.openEditor(
-                null,
-                defaultLocalFolderId: _notesKey.currentState?.selectedLocalFolderId,
-              ),
+              onPressed: _showNotesCreateMenu,
               icon: Icons.add,
             )
-          : isTransactions
+          : isSchedules && !(_schedulesKey.currentState?.isSearching ?? false)
               ? AppFAB(
-                  heroTag: 'transactions_fab',
-                  backgroundColor: AppColors.brand,
-                  foregroundColor: Colors.white,
-                  onPressed: () => _transactionsKey.currentState?.openEditor(null),
+                  heroTag: 'schedules_fab',
+                  onPressed: () =>
+                      _schedulesKey.currentState?.openAddSchedule(),
                   icon: Icons.add,
                 )
-              : null,
+              : isAlarms
+                  ? AppFAB(
+                      heroTag: 'alarms_fab',
+                      onPressed: () => _alarmsKey.currentState?.openAddAlarm(),
+                      icon: Icons.add,
+                    )
+                  : isMusic
+                      ? AppFAB(
+                          heroTag: 'music_fab',
+                          onPressed: () =>
+                              _musicKey.currentState?.openAddMusic(),
+                          icon: Icons.add,
+                        )
+                      : isVideos
+                          ? AppFAB(
+                              heroTag: 'videos_fab',
+                              onPressed: () =>
+                                  _videosKey.currentState?.openAddVideo(),
+                              icon: Icons.add,
+                            )
+                          : isTransactions
+                              ? AppFAB(
+                                  heroTag: 'transactions_fab',
+                                  onPressed: () => _transactionsKey.currentState
+                                      ?.openEditor(null),
+                                  icon: Icons.add,
+                                )
+                              : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        destinations: modules.map((m) => NavigationDestination(
-          icon: Icon(m.icon),
-          label: m.label,
-        )).toList(),
+        destinations: modules
+            .map((m) => NavigationDestination(
+                  icon: Icon(m.icon),
+                  label: m.label,
+                ))
+            .toList(),
       ),
     );
   }
 
+  Future<void> _runSync(String moduleId, Future<void>? Function() sync) async {
+    if (_syncingModuleId != null) return;
+    setState(() => _syncingModuleId = moduleId);
+    try {
+      await sync();
+    } finally {
+      if (mounted) setState(() => _syncingModuleId = null);
+    }
+  }
+
+  Folder? _currentNotesFolder() {
+    final selectedLocalFolderId = _notesKey.currentState?.selectedLocalFolderId;
+    if (selectedLocalFolderId == null) return null;
+
+    final folderService = context.read<LocalFolderService>();
+    for (final folder in folderService.folders) {
+      if (folder.localId == selectedLocalFolderId &&
+          folder.syncStatus != 'deleted') {
+        return folder;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _showNotesCreateMenu() async {
+    final currentFolder = _currentNotesFolder();
+    final selectedLocalFolderId = _notesKey.currentState?.selectedLocalFolderId;
+    final folderLabel = currentFolder?.name ?? '当前列表';
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.pageHorizontal,
+            AppSpacing.sm,
+            AppSpacing.pageHorizontal,
+            AppSpacing.xl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('新建', style: AppTypography.h2Light()),
+              const SizedBox(height: AppSpacing.sm),
+              AppListTile(
+                leading: const Icon(Icons.note_add_outlined, size: 20),
+                title: '新建笔记',
+                subtitle: selectedLocalFolderId == null
+                    ? '添加到全部笔记'
+                    : '添加到“$folderLabel”',
+                onTap: () => Navigator.pop(ctx, 'note'),
+              ),
+              AppListTile(
+                leading: const Icon(Icons.create_new_folder_outlined, size: 20),
+                title: '新建文件夹',
+                subtitle: selectedLocalFolderId == null
+                    ? '创建为根文件夹'
+                    : '创建到“$folderLabel”下',
+                onTap: () => Navigator.pop(ctx, 'folder'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+
+    switch (action) {
+      case 'note':
+        await _notesKey.currentState?.openEditor(
+          null,
+          defaultLocalFolderId: selectedLocalFolderId,
+        );
+      case 'folder':
+        await _addFolder(currentFolder);
+    }
+  }
+
   Widget _buildFolderDrawer() {
     final folderService = context.watch<LocalFolderService>();
-    final allFolders = folderService.folders.where((f) => f.syncStatus != 'deleted').toList();
+    final allFolders =
+        folderService.folders.where((f) => f.syncStatus != 'deleted').toList();
 
-    final idToLocalId = <int, String>{for (final f in allFolders) if (f.id != null) f.id!: f.localId};
+    final idToLocalId = <int, String>{
+      for (final f in allFolders)
+        if (f.id != null) f.id!: f.localId
+    };
     final childrenMap = <String?, List<Folder>>{};
     for (final f in allFolders) {
-      final parentKey = f.localParentId ?? (f.parentId != null ? idToLocalId[f.parentId] : null);
+      final parentKey = f.localParentId ??
+          (f.parentId != null ? idToLocalId[f.parentId] : null);
       (childrenMap[parentKey] ??= []).add(f);
     }
     for (final list in childrenMap.values) {
@@ -279,7 +404,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   )
                 else
                   const SizedBox(width: 28),
-                const Icon(Icons.folder_outlined, size: 20, color: AppColors.brand),
+                const Icon(Icons.folder_outlined,
+                    size: 20, color: AppColors.brand),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Text(
@@ -295,7 +421,8 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (hasChildren && isExpanded) {
-        result.addAll(_buildDrawerFolderTree(children, childrenMap, depth: depth + 1));
+        result.addAll(
+            _buildDrawerFolderTree(children, childrenMap, depth: depth + 1));
       }
     }
 
@@ -357,12 +484,13 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _addFolder(Folder? parent) async {
+  Future<void> _addFolder(Folder? parent) async {
     final nameC = TextEditingController();
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg)),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
           child: Padding(
@@ -429,5 +557,69 @@ class _HomeScreenState extends State<HomeScreen> {
       final folderService = context.read<LocalFolderService>();
       await folderService.deleteFolder(folder.localId);
     }
+  }
+}
+
+class _SyncIconButton extends StatefulWidget {
+  final bool isSyncing;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _SyncIconButton({
+    required this.isSyncing,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  State<_SyncIconButton> createState() => _SyncIconButtonState();
+}
+
+class _SyncIconButtonState extends State<_SyncIconButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    if (widget.isSyncing) _controller.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SyncIconButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isSyncing && !oldWidget.isSyncing) {
+      _controller.repeat();
+    } else if (!widget.isSyncing && oldWidget.isSyncing) {
+      _controller.stop();
+      _controller.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppIconButton(
+      icon: Icons.sync,
+      tooltip: widget.isSyncing ? '正在同步' : widget.tooltip,
+      onPressed: widget.isSyncing ? null : widget.onPressed,
+      child: RotationTransition(
+        turns: _controller,
+        child: Icon(
+          Icons.sync,
+          size: 22,
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
+      ),
+    );
   }
 }
