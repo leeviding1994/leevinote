@@ -169,13 +169,18 @@ class ScheduleService extends ChangeNotifier {
           } catch (_) {}
         } else if (schedule.syncStatus == 'local' || schedule.syncStatus == 'modified') {
           try {
-            final result = await _api.post(ApiConstants.schedules, schedule.toRemoteJson());
+            final result = schedule.id == null
+                ? await _api.post(ApiConstants.schedules, schedule.toRemoteJson())
+                : await _api.put(
+                    '${ApiConstants.schedules}/${schedule.id}',
+                    schedule.toRemoteJson(),
+                  );
             final remoteId = result['id'];
             final newId = remoteId is int
                 ? remoteId
                 : int.tryParse(remoteId?.toString() ?? '');
             await _local.updateSchedule(schedule.copyWith(
-              id: newId,
+              id: newId ?? schedule.id,
               syncStatus: 'synced',
             ));
           } catch (_) {}

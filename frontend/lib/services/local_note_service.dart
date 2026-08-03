@@ -131,7 +131,9 @@ class LocalNoteService extends ChangeNotifier {
     final i = _notes.indexWhere((n) => n.id != null && n.id == remote.id);
     if (i != -1) {
       final existing = _notes[i];
-      if (existing.syncStatus == 'deleted') {
+      if (existing.syncStatus == 'deleted' ||
+          existing.syncStatus == 'local' ||
+          existing.syncStatus == 'modified') {
         return;
       }
       final updated = remote.copyWith(

@@ -89,13 +89,18 @@ class VideoService extends ChangeNotifier {
           } catch (_) {}
         } else if (video.syncStatus == 'local' || video.syncStatus == 'modified') {
           try {
-            final result = await _api.post(ApiConstants.videos, video.toRemoteJson());
+            final result = video.id == null
+                ? await _api.post(ApiConstants.videos, video.toRemoteJson())
+                : await _api.put(
+                    '${ApiConstants.videos}/${video.id}',
+                    video.toRemoteJson(),
+                  );
             final remoteId = result['id'];
             final newId = remoteId is int
                 ? remoteId
                 : int.tryParse(remoteId?.toString() ?? '');
             await _local.updateVideo(video.copyWith(
-              id: newId,
+              id: newId ?? video.id,
               syncStatus: 'synced',
             ));
           } catch (_) {}

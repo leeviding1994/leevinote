@@ -143,11 +143,11 @@ class LeevinoteApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-            create: (_) => AuthService(onLogin: () async {
+            create: (_) => AuthService(apiService: apiService, onLogin: () async {
                   await settings.syncFromServer();
                 })),
         ChangeNotifierProvider.value(value: settings),
-        Provider(create: (_) => ApiService()),
+        Provider.value(value: apiService),
         ChangeNotifierProvider.value(value: localNoteService),
         ChangeNotifierProvider.value(value: localFolderService),
         ChangeNotifierProvider(create: (_) => LocalAlarmService()),

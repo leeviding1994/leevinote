@@ -5,6 +5,7 @@ import com.leevinote.backend.repository.VideoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +18,17 @@ public class VideoService {
 
     public Video createVideo(Video video) {
         return videoRepository.save(video);
+    }
+
+    public Optional<Video> updateVideo(Long id, Long userId, Video updated) {
+        return videoRepository.findByIdAndUserId(id, userId)
+                .map(video -> {
+                    video.setTitle(updated.getTitle());
+                    video.setDescription(updated.getDescription());
+                    video.setFileUrl(updated.getFileUrl());
+                    video.setDuration(updated.getDuration());
+                    return videoRepository.save(video);
+                });
     }
 
     public boolean deleteVideo(Long id, Long userId) {

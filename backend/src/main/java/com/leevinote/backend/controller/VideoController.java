@@ -33,6 +33,15 @@ public class VideoController {
         return ResponseEntity.ok(videoService.createVideo(video));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Video> updateVideo(@PathVariable Long id, @RequestBody Video video) {
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
+        return videoService.updateVideo(id, userId, video)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteVideo(@PathVariable Long id) {
         Long userId = SecurityContextUtil.getCurrentUserId();

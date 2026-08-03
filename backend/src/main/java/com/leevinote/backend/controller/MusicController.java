@@ -33,6 +33,15 @@ public class MusicController {
         return ResponseEntity.ok(musicService.createMusic(music));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Music> updateMusic(@PathVariable Long id, @RequestBody Music music) {
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
+        return musicService.updateMusic(id, userId, music)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteMusic(@PathVariable Long id) {
         Long userId = SecurityContextUtil.getCurrentUserId();

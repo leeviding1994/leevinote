@@ -36,6 +36,9 @@ public class UserSettingsService {
         if (newSettings.getModuleOrder() != null) {
             settings.setModuleOrder(newSettings.getModuleOrder());
         }
+        if (newSettings.getModuleVisibility() != null) {
+            settings.setModuleVisibility(newSettings.getModuleVisibility());
+        }
         return userSettingsRepository.save(settings);
     }
 }

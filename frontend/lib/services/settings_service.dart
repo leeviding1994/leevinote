@@ -67,7 +67,7 @@ class SettingsService extends ChangeNotifier {
   Map<String, bool> _moduleVisibility = Map.from(_defaultModuleVisibility);
   bool _loaded = false;
 
-  SettingsService({ApiService? apiService}) : _api = apiService ?? ApiService();
+  SettingsService({required ApiService apiService}) : _api = apiService;
 
   AppThemeMode get themeMode => _themeMode;
   Color get themeColor => _themeColor;
@@ -116,8 +116,8 @@ class SettingsService extends ChangeNotifier {
       final colorValue = prefs.getInt('theme_color');
       _themeColor = colorValue != null ? Color(colorValue) : _themeColors.first;
       final order = prefs.getStringList('module_order');
-      if (order != null && _isValidModuleOrder(order)) {
-        _moduleOrder = order;
+      if (order != null) {
+        _moduleOrder = _normalizeModuleOrder(order);
       }
       final visibility = prefs.getStringList('module_visibility');
       if (visibility != null) {
@@ -162,9 +162,7 @@ class SettingsService extends ChangeNotifier {
         final orderStr = response['module_order'] as String?;
         if (orderStr != null && orderStr.isNotEmpty) {
           final order = orderStr.split(',');
-          if (_isValidModuleOrder(order)) {
-            _moduleOrder = order;
-          }
+          _moduleOrder = _normalizeModuleOrder(order);
         }
         final visibilityStr = response['module_visibility'] as String?;
         if (visibilityStr != null && visibilityStr.isNotEmpty) {
@@ -213,17 +211,26 @@ class SettingsService extends ChangeNotifier {
   }
 
   Future<void> setModuleOrder(List<String> order) async {
-    if (_isValidModuleOrder(order)) {
-      _moduleOrder = order;
-      await _persist();
-      await syncToServer();
-      notifyListeners();
-    }
+    _moduleOrder = _normalizeModuleOrder(order);
+    await _persist();
+    await syncToServer();
+    notifyListeners();
   }
 
-  bool _isValidModuleOrder(List<String> order) {
+  List<String> _normalizeModuleOrder(List<String> order) {
     final validIds = _defaultModules.map((m) => m.id).toSet();
-    return order.length == validIds.length && order.every(validIds.contains);
+    final normalized = <String>[];
+    for (final id in order) {
+      if (validIds.contains(id) && !normalized.contains(id)) {
+        normalized.add(id);
+      }
+    }
+    for (final module in _defaultModules) {
+      if (!normalized.contains(module.id)) {
+        normalized.add(module.id);
+      }
+    }
+    return normalized;
   }
 
   Future<void> setModuleVisibility(String moduleId, bool visible) async {

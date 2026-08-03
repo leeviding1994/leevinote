@@ -94,6 +94,7 @@ class LocalScheduleService extends ChangeNotifier {
     final i = _schedules.indexWhere((s) => s.id != null && s.id == remote.id);
     if (i != -1) {
       final existing = _schedules[i];
+      if (existing.syncStatus != 'synced') return;
       _schedules[i] = remote.copyWith(localId: existing.localId);
     } else {
       _schedules.add(remote);

@@ -188,13 +188,18 @@ class MusicService extends ChangeNotifier {
           } catch (_) {}
         } else if (music.syncStatus == 'local' || music.syncStatus == 'modified') {
           try {
-            final result = await _api.post(ApiConstants.music, music.toRemoteJson());
+            final result = music.id == null
+                ? await _api.post(ApiConstants.music, music.toRemoteJson())
+                : await _api.put(
+                    '${ApiConstants.music}/${music.id}',
+                    music.toRemoteJson(),
+                  );
             final remoteId = result['id'];
             final newId = remoteId is int
                 ? remoteId
                 : int.tryParse(remoteId?.toString() ?? '');
             await _local.updateMusic(music.copyWith(
-              id: newId,
+              id: newId ?? music.id,
               syncStatus: 'synced',
             ));
           } catch (_) {}

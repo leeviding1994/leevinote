@@ -5,7 +5,7 @@ import 'package:leevinote/services/api_service.dart';
 import 'package:leevinote/models/user.dart';
 
 class AuthService extends ChangeNotifier {
-  final _api = ApiService();
+  final ApiService _api;
 
   bool _isAuthenticated = false;
   String? _username;
@@ -36,7 +36,10 @@ class AuthService extends ChangeNotifier {
     return _username ?? '未登录';
   }
 
-  AuthService({VoidCallback? onLogin}) {
+  AuthService({
+    required ApiService apiService,
+    VoidCallback? onLogin,
+  }) : _api = apiService {
     _onLogin = onLogin;
     _checkAuth();
   }

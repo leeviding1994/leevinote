@@ -220,13 +220,18 @@ class AlarmService extends ChangeNotifier {
           } catch (_) {}
         } else if (alarm.syncStatus == 'local' || alarm.syncStatus == 'modified') {
           try {
-            final result = await _api.post(ApiConstants.alarms, alarm.toRemoteJson());
+            final result = alarm.id == null
+                ? await _api.post(ApiConstants.alarms, alarm.toRemoteJson())
+                : await _api.put(
+                    '${ApiConstants.alarms}/${alarm.id}',
+                    alarm.toRemoteJson(),
+                  );
             final remoteId = result['id'];
             final newId = remoteId is int
                 ? remoteId
                 : int.tryParse(remoteId?.toString() ?? '');
             await _local.updateAlarm(alarm.copyWith(
-              id: newId,
+              id: newId ?? alarm.id,
               syncStatus: 'synced',
             ));
           } catch (_) {}

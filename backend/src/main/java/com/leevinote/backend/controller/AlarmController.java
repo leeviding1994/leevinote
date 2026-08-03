@@ -33,6 +33,15 @@ public class AlarmController {
         return ResponseEntity.ok(alarmService.createAlarm(alarm));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Alarm> updateAlarm(@PathVariable Long id, @RequestBody Alarm alarm) {
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
+        return alarmService.updateAlarm(id, userId, alarm)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteAlarm(@PathVariable Long id) {
         Long userId = SecurityContextUtil.getCurrentUserId();

@@ -80,6 +80,7 @@ class LocalVideoService extends ChangeNotifier {
     final i = _videoList.indexWhere((m) => m.id != null && m.id == remote.id);
     if (i != -1) {
       final existing = _videoList[i];
+      if (existing.syncStatus != 'synced') return;
       _videoList[i] = remote.copyWith(localId: existing.localId);
     } else {
       _videoList.add(remote);

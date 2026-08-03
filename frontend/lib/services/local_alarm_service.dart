@@ -80,6 +80,7 @@ class LocalAlarmService extends ChangeNotifier {
     final i = _alarms.indexWhere((a) => a.id != null && a.id == remote.id);
     if (i != -1) {
       final existing = _alarms[i];
+      if (existing.syncStatus != 'synced') return;
       _alarms[i] = remote.copyWith(localId: existing.localId);
     } else {
       _alarms.add(remote);

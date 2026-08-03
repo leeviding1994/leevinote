@@ -80,6 +80,7 @@ class LocalMusicService extends ChangeNotifier {
     final i = _musicList.indexWhere((m) => m.id != null && m.id == remote.id);
     if (i != -1) {
       final existing = _musicList[i];
+      if (existing.syncStatus != 'synced') return;
       _musicList[i] = remote.copyWith(localId: existing.localId);
     } else {
       _musicList.add(remote);
