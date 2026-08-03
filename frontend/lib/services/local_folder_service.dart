@@ -71,7 +71,7 @@ class LocalFolderService extends ChangeNotifier {
   }
 
   Future<void> replaceAll(List<Folder> folders) async {
-    await _db.clearAll();
+    await _db.clearFolders();
     for (final folder in folders) {
       await _db.insertFolder(folder);
     }
@@ -116,7 +116,7 @@ class LocalFolderService extends ChangeNotifier {
 
   Future<void> clearAll() async {
     await ensureLoaded();
-    await _db.clearAll();
+    await _db.clearFolders();
     _folders = [];
     notifyListeners();
   }

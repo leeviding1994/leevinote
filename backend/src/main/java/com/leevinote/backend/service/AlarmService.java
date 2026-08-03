@@ -19,7 +19,12 @@ public class AlarmService {
         return alarmRepository.save(alarm);
     }
 
-    public void deleteAlarm(Long id) {
-        alarmRepository.deleteById(id);
+    public boolean deleteAlarm(Long id, Long userId) {
+        return alarmRepository.findByIdAndUserId(id, userId)
+                .map(alarm -> {
+                    alarmRepository.delete(alarm);
+                    return true;
+                })
+                .orElse(false);
     }
 }

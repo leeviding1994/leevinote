@@ -1,6 +1,8 @@
 package com.leevinote.backend.controller;
 
 import com.leevinote.backend.entity.Music;
+import com.leevinote.backend.entity.User;
+import com.leevinote.backend.security.SecurityContextUtil;
 import com.leevinote.backend.service.MusicService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,21 +18,28 @@ public class MusicController {
 
     @GetMapping
     public ResponseEntity<List<Music>> getMusic() {
-        Long userId = 1L; // TODO: 从SecurityContext获取
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(musicService.getMusicByUser(userId));
     }
 
     @PostMapping
     public ResponseEntity<Music> createMusic(@RequestBody Music music) {
-        com.leevinote.backend.entity.User user = new com.leevinote.backend.entity.User();
-        user.setId(1L);
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
+        User user = new User();
+        user.setId(userId);
         music.setUser(user);
         return ResponseEntity.ok(musicService.createMusic(music));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteMusic(@PathVariable Long id) {
-        musicService.deleteMusic(id);
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
+        if (!musicService.deleteMusic(id, userId)) {
+            return ResponseEntity.notFound().build();
+        }
         return ResponseEntity.ok(Map.of("message", "Music deleted"));
     }
 }

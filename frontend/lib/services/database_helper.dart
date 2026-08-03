@@ -222,12 +222,14 @@ class DatabaseHelper {
   }
 
   // Notes CRUD
-  Future<List<Map<String, dynamic>>> getAllNotes() async {
+  Future<List<Map<String, dynamic>>> getAllNotes({
+    bool includeDeleted = false,
+  }) async {
     final db = await database;
     return await db.query(
       'notes',
-      where: 'is_deleted = ?',
-      whereArgs: [0],
+      where: includeDeleted ? null : 'is_deleted = ?',
+      whereArgs: includeDeleted ? null : [0],
       orderBy: 'created_at DESC',
     );
   }
@@ -655,11 +657,21 @@ class DatabaseHelper {
     );
   }
 
-  Future<void> clearAll() async {
+  Future<void> clearNotes() async {
     final db = await database;
     await db.delete('notes');
     await db.delete('notes_fts');
+  }
+
+  Future<void> clearFolders() async {
+    final db = await database;
     await db.delete('folders');
+  }
+
+  Future<void> clearAll() async {
+    final db = await database;
+    await clearNotes();
+    await clearFolders();
     await db.delete('transactions');
     await db.delete('transaction_categories');
   }

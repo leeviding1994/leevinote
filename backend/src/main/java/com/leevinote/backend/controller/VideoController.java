@@ -1,6 +1,8 @@
 package com.leevinote.backend.controller;
 
 import com.leevinote.backend.entity.Video;
+import com.leevinote.backend.entity.User;
+import com.leevinote.backend.security.SecurityContextUtil;
 import com.leevinote.backend.service.VideoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,21 +18,28 @@ public class VideoController {
 
     @GetMapping
     public ResponseEntity<List<Video>> getVideos() {
-        Long userId = 1L; // TODO: 从SecurityContext获取
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(videoService.getVideosByUser(userId));
     }
 
     @PostMapping
     public ResponseEntity<Video> createVideo(@RequestBody Video video) {
-        com.leevinote.backend.entity.User user = new com.leevinote.backend.entity.User();
-        user.setId(1L);
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
+        User user = new User();
+        user.setId(userId);
         video.setUser(user);
         return ResponseEntity.ok(videoService.createVideo(video));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteVideo(@PathVariable Long id) {
-        videoService.deleteVideo(id);
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
+        if (!videoService.deleteVideo(id, userId)) {
+            return ResponseEntity.notFound().build();
+        }
         return ResponseEntity.ok(Map.of("message", "Video deleted"));
     }
 }

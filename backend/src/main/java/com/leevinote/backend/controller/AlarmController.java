@@ -1,6 +1,8 @@
 package com.leevinote.backend.controller;
 
 import com.leevinote.backend.entity.Alarm;
+import com.leevinote.backend.entity.User;
+import com.leevinote.backend.security.SecurityContextUtil;
 import com.leevinote.backend.service.AlarmService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,21 +18,28 @@ public class AlarmController {
 
     @GetMapping
     public ResponseEntity<List<Alarm>> getAlarms() {
-        Long userId = 1L; // TODO: 从SecurityContext获取
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(alarmService.getAlarmsByUser(userId));
     }
 
     @PostMapping
     public ResponseEntity<Alarm> createAlarm(@RequestBody Alarm alarm) {
-        com.leevinote.backend.entity.User user = new com.leevinote.backend.entity.User();
-        user.setId(1L);
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
+        User user = new User();
+        user.setId(userId);
         alarm.setUser(user);
         return ResponseEntity.ok(alarmService.createAlarm(alarm));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteAlarm(@PathVariable Long id) {
-        alarmService.deleteAlarm(id);
+        Long userId = SecurityContextUtil.getCurrentUserId();
+        if (userId == null) return ResponseEntity.status(401).build();
+        if (!alarmService.deleteAlarm(id, userId)) {
+            return ResponseEntity.notFound().build();
+        }
         return ResponseEntity.ok(Map.of("message", "Alarm deleted"));
     }
 }

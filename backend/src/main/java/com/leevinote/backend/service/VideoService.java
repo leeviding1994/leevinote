@@ -19,7 +19,12 @@ public class VideoService {
         return videoRepository.save(video);
     }
 
-    public void deleteVideo(Long id) {
-        videoRepository.deleteById(id);
+    public boolean deleteVideo(Long id, Long userId) {
+        return videoRepository.findByIdAndUserId(id, userId)
+                .map(video -> {
+                    videoRepository.delete(video);
+                    return true;
+                })
+                .orElse(false);
     }
 }

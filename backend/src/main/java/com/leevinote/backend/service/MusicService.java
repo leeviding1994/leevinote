@@ -19,7 +19,12 @@ public class MusicService {
         return musicRepository.save(music);
     }
 
-    public void deleteMusic(Long id) {
-        musicRepository.deleteById(id);
+    public boolean deleteMusic(Long id, Long userId) {
+        return musicRepository.findByIdAndUserId(id, userId)
+                .map(music -> {
+                    musicRepository.delete(music);
+                    return true;
+                })
+                .orElse(false);
     }
 }

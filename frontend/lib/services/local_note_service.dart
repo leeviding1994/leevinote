@@ -21,7 +21,7 @@ class LocalNoteService extends ChangeNotifier {
 
   Future<void> _load() async {
     try {
-      final rows = await _db.getAllNotes();
+      final rows = await _db.getAllNotes(includeDeleted: true);
       _notes = rows.map((r) => _rowToNote(r)).toList();
 
       final prefs = await SharedPreferences.getInstance();
@@ -76,16 +76,21 @@ class LocalNoteService extends ChangeNotifier {
   Future<void> deleteNote(String localId) async {
     await ensureLoaded();
     final index = _notes.indexWhere((n) => n.localId == localId);
-    if (index != -1) {
-      final note = _notes[index];
-      if (note.id != null) {
-        _deletedNoteIds.add(note.id.toString());
-      }
-      _deletedNoteIds.add(note.localId);
-      await _persistDeletedIds();
+    if (index == -1) return;
+
+    final note = _notes[index];
+    _deletedNoteIds.add(note.localId);
+    if (note.id != null) {
+      _deletedNoteIds.add(note.id.toString());
+      final deleted = note.copyWith(syncStatus: 'deleted');
+      await _db.updateNote(deleted);
+      await _db.deleteNote(localId);
+      _notes[index] = deleted;
+    } else {
+      await _db.forceDeleteNote(localId);
+      _notes.removeAt(index);
     }
-    await _db.deleteNote(localId);
-    _notes.removeWhere((n) => n.localId == localId);
+    await _persistDeletedIds();
     notifyListeners();
   }
 
@@ -106,7 +111,7 @@ class LocalNoteService extends ChangeNotifier {
   }
 
   Future<void> replaceAll(List<Note> notes) async {
-    await _db.clearAll();
+    await _db.clearNotes();
     for (final note in notes) {
       await _db.insertNote(note);
     }
@@ -147,7 +152,7 @@ class LocalNoteService extends ChangeNotifier {
 
   Future<void> clearAll() async {
     await ensureLoaded();
-    await _db.clearAll();
+    await _db.clearNotes();
     _notes = [];
     _deletedNoteIds.clear();
     await _persistDeletedIds();

@@ -68,11 +68,7 @@ class NotesScreenState extends State<NotesScreen> {
   }
 
   Future<void> _deleteNote(Note note) async {
-    if (note.id != null) {
-      await _noteService.forceDeleteNote(note.localId);
-    } else {
-      await _noteService.deleteNote(note.localId);
-    }
+    await _noteService.deleteNote(note.localId);
     await _updateFilteredNotes();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -626,7 +622,7 @@ class NotesScreenState extends State<NotesScreen> {
         if (note.id != null &&
             note.syncStatus == 'synced' &&
             !remoteNoteIds.contains(note.id)) {
-          await _noteService.deleteNote(note.localId);
+          await _noteService.forceDeleteNote(note.localId);
         }
       }
       for (final e in remoteData) {
