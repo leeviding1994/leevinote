@@ -25,10 +25,11 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: (db, version) async {
         await _createTables(db);
         await _createTransactionTables(db);
+        await _createHealthTables(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion == 1) {
@@ -47,9 +48,14 @@ class DatabaseHelper {
           await _createNoteSearchIndex(db);
           await _rebuildNoteSearchIndex(db);
         }
+        if (oldVersion <= 4) {
+          // v4 -> v5: add health tracking module tables
+          await _createHealthTables(db);
+        }
       },
       onOpen: (db) async {
         await _createTransactionTables(db);
+        await _createHealthTables(db);
         await _createNoteSearchIndex(db);
         if (!_migrated) {
           await _migrateFromSharedPreferences(db);
@@ -152,7 +158,8 @@ class DatabaseHelper {
 
   Future<void> _upsertNoteSearchIndex(Database db, Note note) async {
     if (!_noteSearchIndexEnabled) return;
-    await db.delete('notes_fts', where: 'local_id = ?', whereArgs: [note.localId]);
+    await db
+        .delete('notes_fts', where: 'local_id = ?', whereArgs: [note.localId]);
     await db.insert('notes_fts', {
       'local_id': note.localId,
       'title': note.title,
@@ -178,19 +185,22 @@ class DatabaseHelper {
         for (final e in list) {
           final note = Note.fromJson(e as Map<String, dynamic>);
           if (note.syncStatus != 'deleted') {
-            await db.insert('notes', {
-              'id': note.id,
-              'local_id': note.localId,
-              'title': note.title,
-              'content': note.content,
-              'category': note.category,
-              'folder_id': note.folderId,
-              'local_folder_id': note.localFolderId,
-              'sync_status': note.syncStatus,
-              'created_at': note.createdAt.millisecondsSinceEpoch,
-              'updated_at': note.updatedAt.millisecondsSinceEpoch,
-              'is_deleted': 0,
-            }, conflictAlgorithm: ConflictAlgorithm.replace);
+            await db.insert(
+                'notes',
+                {
+                  'id': note.id,
+                  'local_id': note.localId,
+                  'title': note.title,
+                  'content': note.content,
+                  'category': note.category,
+                  'folder_id': note.folderId,
+                  'local_folder_id': note.localFolderId,
+                  'sync_status': note.syncStatus,
+                  'created_at': note.createdAt.millisecondsSinceEpoch,
+                  'updated_at': note.updatedAt.millisecondsSinceEpoch,
+                  'is_deleted': 0,
+                },
+                conflictAlgorithm: ConflictAlgorithm.replace);
           }
         }
       }
@@ -202,17 +212,20 @@ class DatabaseHelper {
         for (final e in list) {
           final folder = Folder.fromJson(e as Map<String, dynamic>);
           if (folder.syncStatus != 'deleted') {
-            await db.insert('folders', {
-              'id': folder.id,
-              'local_id': folder.localId,
-              'name': folder.name,
-              'parent_id': folder.parentId,
-              'local_parent_id': folder.localParentId,
-              'sync_status': folder.syncStatus,
-              'created_at': folder.createdAt.millisecondsSinceEpoch,
-              'updated_at': folder.updatedAt.millisecondsSinceEpoch,
-              'is_deleted': 0,
-            }, conflictAlgorithm: ConflictAlgorithm.replace);
+            await db.insert(
+                'folders',
+                {
+                  'id': folder.id,
+                  'local_id': folder.localId,
+                  'name': folder.name,
+                  'parent_id': folder.parentId,
+                  'local_parent_id': folder.localParentId,
+                  'sync_status': folder.syncStatus,
+                  'created_at': folder.createdAt.millisecondsSinceEpoch,
+                  'updated_at': folder.updatedAt.millisecondsSinceEpoch,
+                  'is_deleted': 0,
+                },
+                conflictAlgorithm: ConflictAlgorithm.replace);
           }
         }
       }
@@ -252,7 +265,8 @@ class DatabaseHelper {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _searchNotesWithLike(Database db, String query) async {
+  Future<List<Map<String, dynamic>>> _searchNotesWithLike(
+      Database db, String query) async {
     return await db.rawQuery('''
       SELECT *
       FROM notes
@@ -271,7 +285,8 @@ class DatabaseHelper {
     return terms.isEmpty ? '""' : terms.join(' AND ');
   }
 
-  Future<List<Map<String, dynamic>>> getNotesByFolder(String? localFolderId) async {
+  Future<List<Map<String, dynamic>>> getNotesByFolder(
+      String? localFolderId) async {
     final db = await database;
     if (localFolderId != null) {
       return await db.query(
@@ -319,7 +334,8 @@ class DatabaseHelper {
     if (note.id != null) {
       data['id'] = note.id;
     }
-    await db.insert('notes', data, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert('notes', data,
+        conflictAlgorithm: ConflictAlgorithm.replace);
     await _upsertNoteSearchIndex(db, note);
   }
 
@@ -404,7 +420,8 @@ class DatabaseHelper {
     if (folder.id != null) {
       data['id'] = folder.id;
     }
-    await db.insert('folders', data, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert('folders', data,
+        conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> updateFolder(Folder folder) async {
@@ -507,6 +524,53 @@ class DatabaseHelper {
     ''');
   }
 
+  Future<void> _createHealthTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS health_entries (
+        local_id TEXT PRIMARY KEY,
+        entry_date INTEGER NOT NULL,
+        weight_kg REAL,
+        body_photo_path TEXT,
+        estimated_body_fat_percent REAL,
+        body_analysis_note TEXT,
+        created_at INTEGER,
+        updated_at INTEGER,
+        is_deleted INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_health_entries_date ON health_entries(entry_date)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_health_entries_is_deleted ON health_entries(is_deleted)
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS meal_entries (
+        local_id TEXT PRIMARY KEY,
+        meal_date INTEGER NOT NULL,
+        meal_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        photo_path TEXT,
+        estimated_calories REAL NOT NULL,
+        protein_g REAL NOT NULL DEFAULT 0,
+        carbs_g REAL NOT NULL DEFAULT 0,
+        fat_g REAL NOT NULL DEFAULT 0,
+        analysis_note TEXT,
+        created_at INTEGER,
+        updated_at INTEGER,
+        is_deleted INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_meal_entries_date ON meal_entries(meal_date)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_meal_entries_is_deleted ON meal_entries(is_deleted)
+    ''');
+  }
+
   // Transaction Categories CRUD
   Future<List<Map<String, dynamic>>> getAllTransactionCategories() async {
     final db = await database;
@@ -518,7 +582,8 @@ class DatabaseHelper {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getTransactionCategoriesByType(String type) async {
+  Future<List<Map<String, dynamic>>> getTransactionCategoriesByType(
+      String type) async {
     final db = await database;
     return await db.query(
       'transaction_categories',
@@ -528,7 +593,8 @@ class DatabaseHelper {
     );
   }
 
-  Future<Map<String, dynamic>?> getTransactionCategoryByLocalId(String localId) async {
+  Future<Map<String, dynamic>?> getTransactionCategoryByLocalId(
+      String localId) async {
     final db = await database;
     final results = await db.query(
       'transaction_categories',
@@ -548,7 +614,8 @@ class DatabaseHelper {
     );
   }
 
-  Future<void> updateTransactionCategory(String localId, Map<String, dynamic> data) async {
+  Future<void> updateTransactionCategory(
+      String localId, Map<String, dynamic> data) async {
     final db = await database;
     await db.update(
       'transaction_categories',
@@ -588,11 +655,13 @@ class DatabaseHelper {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getTransactionsByDateRange(int start, int end) async {
+  Future<List<Map<String, dynamic>>> getTransactionsByDateRange(
+      int start, int end) async {
     final db = await database;
     return await db.query(
       'transactions',
-      where: 'is_deleted = ? AND transaction_date >= ? AND transaction_date <= ?',
+      where:
+          'is_deleted = ? AND transaction_date >= ? AND transaction_date <= ?',
       whereArgs: [0, start, end],
       orderBy: 'transaction_date DESC, created_at DESC',
     );
@@ -628,7 +697,8 @@ class DatabaseHelper {
     );
   }
 
-  Future<void> updateTransaction(String localId, Map<String, dynamic> data) async {
+  Future<void> updateTransaction(
+      String localId, Map<String, dynamic> data) async {
     final db = await database;
     await db.update(
       'transactions',
@@ -657,6 +727,55 @@ class DatabaseHelper {
     );
   }
 
+  // Health CRUD
+  Future<List<Map<String, dynamic>>> getAllHealthEntries() async {
+    final db = await database;
+    return await db.query(
+      'health_entries',
+      where: 'is_deleted = ?',
+      whereArgs: [0],
+      orderBy: 'entry_date DESC',
+    );
+  }
+
+  Future<void> insertHealthEntry(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert(
+      'health_entries',
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getAllMealEntries() async {
+    final db = await database;
+    return await db.query(
+      'meal_entries',
+      where: 'is_deleted = ?',
+      whereArgs: [0],
+      orderBy: 'meal_date DESC, created_at DESC',
+    );
+  }
+
+  Future<void> insertMealEntry(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert(
+      'meal_entries',
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteMealEntry(String localId) async {
+    final db = await database;
+    await db.update(
+      'meal_entries',
+      {'is_deleted': 1},
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
   Future<void> clearNotes() async {
     final db = await database;
     await db.delete('notes');
@@ -674,5 +793,7 @@ class DatabaseHelper {
     await clearFolders();
     await db.delete('transactions');
     await db.delete('transaction_categories');
+    await db.delete('health_entries');
+    await db.delete('meal_entries');
   }
 }

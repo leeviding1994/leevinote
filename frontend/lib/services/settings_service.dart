@@ -33,7 +33,9 @@ const _defaultModules = [
   NavModule(id: 'music', label: '音乐', icon: Icons.music_note),
   NavModule(id: 'videos', label: '视频', icon: Icons.video_library),
   NavModule(id: 'schedules', label: '日程', icon: Icons.calendar_today),
-  NavModule(id: 'transactions', label: '记账', icon: Icons.account_balance_wallet),
+  NavModule(
+      id: 'transactions', label: '记账', icon: Icons.account_balance_wallet),
+  NavModule(id: 'health', label: '健康', icon: Icons.favorite),
   NavModule(id: 'profile', label: '我的', icon: Icons.person, visible: true),
 ];
 
@@ -44,6 +46,7 @@ const _defaultModuleVisibility = {
   'videos': true,
   'schedules': true,
   'transactions': true,
+  'health': true,
   'profile': true,
 };
 
@@ -81,7 +84,8 @@ class SettingsService extends ChangeNotifier {
         .map((id) => map[id]!)
         .toList();
     final profileModule = map['profile'];
-    final withoutProfile = visibleModules.where((m) => m.id != 'profile').toList();
+    final withoutProfile =
+        visibleModules.where((m) => m.id != 'profile').toList();
     if (profileModule == null) return withoutProfile;
     return [...withoutProfile, profileModule];
   }
@@ -121,7 +125,9 @@ class SettingsService extends ChangeNotifier {
       }
       final visibility = prefs.getStringList('module_visibility');
       if (visibility != null) {
-        final savedVisibility = {for (final v in visibility) v.split(':')[0]: v.split(':')[1] == 'true'};
+        final savedVisibility = {
+          for (final v in visibility) v.split(':')[0]: v.split(':')[1] == 'true'
+        };
         // 合并保存的可见性设置与默认设置：新增模块默认可见
         _moduleVisibility = Map.from(_defaultModuleVisibility);
         for (final entry in savedVisibility.entries) {
@@ -140,7 +146,8 @@ class SettingsService extends ChangeNotifier {
       await prefs.setString('theme_mode', _themeMode.name);
       await prefs.setInt('theme_color', _themeColor.toARGB32());
       await prefs.setStringList('module_order', _moduleOrder);
-      await prefs.setStringList('module_visibility', _moduleVisibility.entries.map((e) => '${e.key}:${e.value}').toList());
+      await prefs.setStringList('module_visibility',
+          _moduleVisibility.entries.map((e) => '${e.key}:${e.value}').toList());
     } catch (_) {}
   }
 
@@ -157,7 +164,8 @@ class SettingsService extends ChangeNotifier {
         }
         final themeColorStr = response['theme_color'] as String?;
         if (themeColorStr != null && themeColorStr.isNotEmpty) {
-          _themeColor = Color(int.parse(themeColorStr.replaceFirst('#', '0xFF')));
+          _themeColor =
+              Color(int.parse(themeColorStr.replaceFirst('#', '0xFF')));
         }
         final orderStr = response['module_order'] as String?;
         if (orderStr != null && orderStr.isNotEmpty) {
@@ -187,9 +195,12 @@ class SettingsService extends ChangeNotifier {
     try {
       await _api.put('/user-settings', {
         'theme_mode': _themeMode.name,
-        'theme_color': '#${_themeColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
+        'theme_color':
+            '#${_themeColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
         'module_order': _moduleOrder.join(','),
-        'module_visibility': _moduleVisibility.entries.map((e) => '${e.key}:${e.value}').join(','),
+        'module_visibility': _moduleVisibility.entries
+            .map((e) => '${e.key}:${e.value}')
+            .join(','),
       });
     } catch (_) {
       // 静默失败，保持本地设置

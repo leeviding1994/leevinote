@@ -8,6 +8,7 @@ import 'package:leevinote/screens/music_screen.dart';
 import 'package:leevinote/screens/videos_screen.dart';
 import 'package:leevinote/screens/schedules_screen.dart';
 import 'package:leevinote/screens/transactions_screen.dart';
+import 'package:leevinote/screens/health_screen.dart';
 import 'package:leevinote/screens/profile_screen.dart';
 import 'package:leevinote/screens/settings_screen.dart';
 import 'package:leevinote/services/auth_service.dart';
@@ -31,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _videosKey = GlobalKey<VideosScreenState>();
   final _schedulesKey = GlobalKey<SchedulesScreenState>();
   final _transactionsKey = GlobalKey<TransactionsScreenState>();
+  final _healthKey = GlobalKey<HealthScreenState>();
   final Set<String> _expandedFolders = {};
 
   @override
@@ -61,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final isVideos = selectedModuleId == 'videos';
     final isSchedules = selectedModuleId == 'schedules';
     final isTransactions = selectedModuleId == 'transactions';
+    final isHealth = selectedModuleId == 'health';
     final isProfile = selectedModuleId == 'profile';
 
     final title = isNotes && _notesKey.currentState != null
@@ -144,6 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'videos': VideosScreen(key: _videosKey),
       'schedules': SchedulesScreen(key: _schedulesKey),
       'transactions': TransactionsScreen(key: _transactionsKey),
+      'health': HealthScreen(key: _healthKey),
       'profile': const ProfileScreen(),
     };
     final children = ids.map((id) => widgetMap[id]!).toList();
@@ -199,7 +203,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ?.openEditor(null),
                                   icon: Icons.add,
                                 )
-                              : null,
+                              : isHealth
+                                  ? AppFAB(
+                                      heroTag: 'health_fab',
+                                      onPressed: () => _healthKey.currentState
+                                          ?.openAddMeal(),
+                                      icon: Icons.add,
+                                    )
+                                  : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),

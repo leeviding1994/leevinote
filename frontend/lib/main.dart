@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
@@ -23,6 +24,7 @@ import 'package:leevinote/services/local_alarm_service.dart';
 import 'package:leevinote/services/local_music_service.dart';
 import 'package:leevinote/services/local_video_service.dart';
 import 'package:leevinote/services/local_schedule_service.dart';
+import 'package:leevinote/services/local_health_service.dart';
 import 'package:leevinote/services/video_service.dart';
 import 'package:leevinote/services/local_transaction_service.dart';
 import 'package:leevinote/services/local_transaction_category_service.dart';
@@ -94,7 +96,18 @@ void main() async {
   };
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
-    return Container();
+    return Material(
+      color: const Color(0xFFF7F8FB),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            kDebugMode ? '界面构建失败：${details.exception}' : '界面加载失败，请重新打开应用或稍后重试。',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
   };
 
   runApp(
@@ -143,7 +156,9 @@ class LeevinoteApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-            create: (_) => AuthService(apiService: apiService, onLogin: () async {
+            create: (_) => AuthService(
+                apiService: apiService,
+                onLogin: () async {
                   await settings.syncFromServer();
                 })),
         ChangeNotifierProvider.value(value: settings),
@@ -155,6 +170,7 @@ class LeevinoteApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LocalVideoService()),
         ChangeNotifierProvider(create: (_) => LocalScheduleService()),
         ChangeNotifierProvider(create: (_) => LocalTransactionService()),
+        ChangeNotifierProvider(create: (_) => LocalHealthService()),
         ChangeNotifierProvider(
             create: (_) => LocalTransactionCategoryService()),
         ChangeNotifierProvider(create: (_) => HolidayService()),
