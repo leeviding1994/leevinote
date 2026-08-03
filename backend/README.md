@@ -4,9 +4,8 @@ Leevinote平台后端服务 - 支持笔记、闹钟、音乐播放、视频播�
 
 ## 技术栈
 
-- **Java 17** + **Spring Boot 3.2.1**
+- **Java 21** + **Spring Boot 3.2.1**
 - **PostgreSQL** 数据库
-- **Redis** 缓存
 - **JWT** 认证
 - **Spring Security** 安全框架
 - **Spring Data JPA** ORM
@@ -16,16 +15,15 @@ Leevinote平台后端服务 - 支持笔记、闹钟、音乐播放、视频播�
 
 ### 前置要求
 
-- JDK 17+
-- Maven 3.6+
+- JDK 21+
 - PostgreSQL 16+
-- Redis 7+
 
 ### 使用Docker启动（推荐）
 
 ```bash
 cd backend
-docker-compose up -d
+cp .env.example .env
+docker compose up -d --build
 ```
 
 ### 本地开发
@@ -33,15 +31,19 @@ docker-compose up -d
 1. 创建数据库：
 ```sql
 CREATE DATABASE leevinote;
-CREATE USER leevinote WITH PASSWORD 'leevinote123';
+CREATE USER leevinote WITH PASSWORD '替换为安全密码';
 GRANT ALL PRIVILEGES ON DATABASE leevinote TO leevinote;
 ```
 
-2. 修改 `src/main/resources/application.yml` 中的数据库配置
+2. 配置环境变量：
+```bash
+export DB_PASSWORD='你的数据库密码'
+export JWT_SECRET='至少 64 字节的随机字符串'
+```
 
 3. 启动应用：
 ```bash
-mvn spring-boot:run
+./gradlew bootRun
 ```
 
 4. 访问API文档：http://localhost:8080/api/swagger-ui.html
@@ -60,22 +62,26 @@ mvn spring-boot:run
 ### 闹钟
 - `GET /api/alarms` - 获取闹钟列表
 - `POST /api/alarms` - 创建闹钟
+- `PUT /api/alarms/{id}` - 更新闹钟
 - `DELETE /api/alarms/{id}` - 删除闹钟
 
 ### 音乐
 - `GET /api/music` - 获取音乐列表
 - `POST /api/music` - 添加音乐
+- `PUT /api/music/{id}` - 更新音乐
 - `DELETE /api/music/{id}` - 删除音乐
 
 ### 视频
 - `GET /api/videos` - 获取视频列表
 - `POST /api/videos` - 添加视频
+- `PUT /api/videos/{id}` - 更新视频
 - `DELETE /api/videos/{id}` - 删除视频
 
 ### 日程
 - `GET /api/schedules` - 获取日程列表
 - `POST /api/schedules` - 创建日程
 - `GET /api/schedules/{id}` - 获取日程详情
+- `PUT /api/schedules/{id}` - 更新日程
 - `DELETE /api/schedules/{id}` - 删除日程
 
 ### 记账
@@ -103,11 +109,10 @@ src/main/java/com/leevinote/backend/
 └── exception/       # 异常处理
 ```
 
-## TODO
+## 测试
 
-- [ ] 完善用户ID获取逻辑（从SecurityContext）
-- [ ] 添加文件上传功能（音乐/视频）
-- [ ] 实现闹钟推送通知
-- [ ] 添加单元测试
-- [ ] 添加数据校验
-- [ ] 实现分页查询
+```bash
+DB_PASSWORD='你的数据库密码' \
+JWT_SECRET='至少 64 字节的随机字符串' \
+./gradlew test
+```

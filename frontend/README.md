@@ -1,6 +1,6 @@
 # Leevinote Flutter Client
 
-跨平台客户端，支持iOS、Android、Windows、Linux、Mac、Web
+跨平台客户端，主要支持 Android、Windows、Linux 和 macOS。Web 端仍处于实验阶段。
 
 ## 技术栈
 
@@ -12,7 +12,6 @@
 - **just_audio** - 音乐播放
 - **video_player** - 视频播放
 - **table_calendar** - 日程日历
-- **go_router** - 路由管理
 
 ## 快速开始
 
@@ -25,10 +24,7 @@
    ```
 
 2. **配置后端地址**
-   编辑 `lib/utils/constants.dart`，修改 `baseUrl`：
-   ```dart
-   static const String baseUrl = 'http://your-backend-url:8080/api';
-   ```
+   使用 `--dart-define=API_BASE_URL=...`，无需修改源码。
 
 ### 运行项目
 
@@ -39,7 +35,7 @@ cd frontend
 flutter pub get
 
 # 运行在Chrome（Web）
-flutter run -d chrome
+flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080/api
 
 # 运行在Android
 flutter run -d android
@@ -51,7 +47,7 @@ flutter run -d ios
 flutter run -d windows
 
 # 运行在Linux
-flutter run -d linux
+flutter run -d linux --dart-define=API_BASE_URL=http://localhost:8080/api
 
 # 运行在Mac
 flutter run -d macos
@@ -69,7 +65,8 @@ lib/
 │   ├── video.dart
 │   ├── schedule.dart
 │   ├── transaction.dart
-│   └── transaction_category.dart
+│   ├── transaction_category.dart
+│   └── health_entry.dart
 ├── screens/              # 页面
 │   ├── login_screen.dart
 │   ├── home_screen.dart
@@ -80,7 +77,8 @@ lib/
 │   ├── schedules_screen.dart
 │   ├── transactions_screen.dart
 │   ├── transaction_editor_screen.dart
-│   └── transaction_category_manager_screen.dart
+│   ├── transaction_category_manager_screen.dart
+│   └── health_screen.dart
 ├── services/             # 服务层
 │   ├── api_service.dart  # API调用
 │   └── auth_service.dart # 认证管理
@@ -93,28 +91,27 @@ lib/
 ## 功能模块
 
 - ✅ 用户认证（登录/注册）
-- 🚧 笔记管理（开发中）
-- 🚧 闹钟提醒（开发中）
-- 🚧 音乐播放（开发中）
-- 🚧 视频播放（开发中）
-- 🚧 日程安排（开发中）
+- ✅ 本地优先笔记与文件夹
+- ✅ 本地闹钟提醒
+- ✅ 音乐和视频管理
+- ✅ 日程安排
 - ✅ 记账管理（支出/收入、分类、日/月/年统计）
+- ✅ 本地健康和饮食记录（当前不进行云同步）
 
 ## 平台支持
 
 | 平台 | 状态 |
 |------|------|
-| iOS | ✅ 支持 |
+| iOS | ⚠️ 未持续验证 |
 | Android | ✅ 支持 |
-| Web | ✅ 支持 |
+| Web | ⚠️ 实验性支持，本地 SQLite 能力尚未完整适配 |
 | Windows | ✅ 支持 |
 | Linux | ✅ 支持 |
 | macOS | ✅ 支持 |
 
-## 下一步
+## 检查
 
-1. 完善各功能模块的UI和服务调用
-2. 实现音乐/视频播放器
-3. 添加本地通知（闹钟提醒）
-4. 实现文件上传功能
-5. 添加离线缓存
+```bash
+flutter analyze
+flutter test
+```
