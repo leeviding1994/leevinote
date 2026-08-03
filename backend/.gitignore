@@ -38,6 +38,7 @@ bin/
 ### Logs ###
 *.log
 logs/
+.env
 
 ### Package Files ###
 *.jar
