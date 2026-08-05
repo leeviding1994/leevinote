@@ -36,6 +36,7 @@ const _defaultModules = [
   NavModule(
       id: 'transactions', label: '记账', icon: Icons.account_balance_wallet),
   NavModule(id: 'health', label: '健康', icon: Icons.favorite),
+  NavModule(id: 'passwords', label: '密码', icon: Icons.shield_outlined),
   NavModule(id: 'profile', label: '我的', icon: Icons.person, visible: true),
 ];
 
@@ -47,6 +48,7 @@ const _defaultModuleVisibility = {
   'schedules': true,
   'transactions': true,
   'health': true,
+  'passwords': true,
   'profile': true,
 };
 

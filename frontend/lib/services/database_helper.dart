@@ -25,11 +25,12 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: (db, version) async {
         await _createTables(db);
         await _createTransactionTables(db);
         await _createHealthTables(db);
+        await _createVaultTables(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion == 1) {
@@ -52,10 +53,15 @@ class DatabaseHelper {
           // v4 -> v5: add health tracking module tables
           await _createHealthTables(db);
         }
+        if (oldVersion <= 5) {
+          // v5 -> v6: add encrypted password vault tables
+          await _createVaultTables(db);
+        }
       },
       onOpen: (db) async {
         await _createTransactionTables(db);
         await _createHealthTables(db);
+        await _createVaultTables(db);
         await _createNoteSearchIndex(db);
         if (!_migrated) {
           await _migrateFromSharedPreferences(db);
@@ -571,6 +577,23 @@ class DatabaseHelper {
     ''');
   }
 
+  Future<void> _createVaultTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS password_vault_items (
+        local_id TEXT PRIMARY KEY,
+        nonce TEXT NOT NULL,
+        cipher_text TEXT NOT NULL,
+        mac TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_password_vault_items_updated_at
+      ON password_vault_items(updated_at DESC)
+    ''');
+  }
+
   // Transaction Categories CRUD
   Future<List<Map<String, dynamic>>> getAllTransactionCategories() async {
     final db = await database;
@@ -774,6 +797,38 @@ class DatabaseHelper {
       where: 'local_id = ?',
       whereArgs: [localId],
     );
+  }
+
+  // Encrypted password vault CRUD. No plaintext secret fields are persisted.
+  Future<List<Map<String, dynamic>>> getAllPasswordVaultItems() async {
+    final db = await database;
+    return db.query(
+      'password_vault_items',
+      orderBy: 'updated_at DESC',
+    );
+  }
+
+  Future<void> upsertPasswordVaultItem(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert(
+      'password_vault_items',
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deletePasswordVaultItem(String localId) async {
+    final db = await database;
+    await db.delete(
+      'password_vault_items',
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  Future<void> clearPasswordVault() async {
+    final db = await database;
+    await db.delete('password_vault_items');
   }
 
   Future<void> clearNotes() async {

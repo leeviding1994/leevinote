@@ -9,6 +9,7 @@ import 'package:leevinote/screens/videos_screen.dart';
 import 'package:leevinote/screens/schedules_screen.dart';
 import 'package:leevinote/screens/transactions_screen.dart';
 import 'package:leevinote/screens/health_screen.dart';
+import 'package:leevinote/screens/password_screen.dart';
 import 'package:leevinote/screens/profile_screen.dart';
 import 'package:leevinote/screens/settings_screen.dart';
 import 'package:leevinote/services/auth_service.dart';
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _schedulesKey = GlobalKey<SchedulesScreenState>();
   final _transactionsKey = GlobalKey<TransactionsScreenState>();
   final _healthKey = GlobalKey<HealthScreenState>();
+  final _passwordsKey = GlobalKey<PasswordScreenState>();
   final Set<String> _expandedFolders = {};
 
   @override
@@ -64,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final isSchedules = selectedModuleId == 'schedules';
     final isTransactions = selectedModuleId == 'transactions';
     final isHealth = selectedModuleId == 'health';
+    final isPasswords = selectedModuleId == 'passwords';
     final isProfile = selectedModuleId == 'profile';
 
     final title = isNotes && _notesKey.currentState != null
@@ -148,6 +151,10 @@ class _HomeScreenState extends State<HomeScreen> {
       'schedules': SchedulesScreen(key: _schedulesKey),
       'transactions': TransactionsScreen(key: _transactionsKey),
       'health': HealthScreen(key: _healthKey),
+      'passwords': PasswordScreen(
+        key: _passwordsKey,
+        active: isPasswords,
+      ),
       'profile': const ProfileScreen(),
     };
     final children = ids.map((id) => widgetMap[id]!).toList();
@@ -210,18 +217,131 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ?.openAddMeal(),
                                       icon: Icons.add,
                                     )
-                                  : null,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        destinations: modules
-            .map((m) => NavigationDestination(
-                  icon: Icon(m.icon),
-                  label: m.label,
-                ))
-            .toList(),
+                                  : isPasswords
+                                      ? AppFAB(
+                                          heroTag: 'passwords_fab',
+                                          onPressed: () => _passwordsKey
+                                              .currentState
+                                              ?.openAddPassword(),
+                                          icon: Icons.add,
+                                        )
+                                      : null,
+      bottomNavigationBar: _buildBottomNavigation(modules),
+    );
+  }
+
+  /// 按窗口宽度估算底部栏最多可平分展示的模块数。
+  int _maxBottomNavSlots(double width) {
+    const minItemWidth = 72.0;
+    const horizontalPadding = AppSpacing.lg * 2;
+    final slots = ((width - horizontalPadding) / minItemWidth).floor();
+    return slots.clamp(3, 9);
+  }
+
+  Widget _buildBottomNavigation(List<NavModule> modules) {
+    final width = MediaQuery.sizeOf(context).width;
+    final selectedIndex = _currentIndex.clamp(0, modules.length - 1);
+    final maxSlots = _maxBottomNavSlots(width);
+    final needsOverflow = modules.length > maxSlots;
+    final visibleSlots = needsOverflow ? maxSlots - 1 : modules.length;
+
+    // 可见模块：尽量按顺序取前 N 个；若当前选中在溢出区，则挤进最后一格
+    final visibleIndices = <int>[];
+    for (var i = 0; i < modules.length && visibleIndices.length < visibleSlots; i++) {
+      visibleIndices.add(i);
+    }
+    if (needsOverflow && !visibleIndices.contains(selectedIndex)) {
+      visibleIndices[visibleIndices.length - 1] = selectedIndex;
+    }
+
+    final overflowIndices = <int>[
+      for (var i = 0; i < modules.length; i++)
+        if (!visibleIndices.contains(i)) i,
+    ];
+    final overflowSelected = overflowIndices.contains(selectedIndex);
+
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainer,
+      elevation: 3,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 68,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            child: Row(
+              children: [
+                for (final index in visibleIndices)
+                  Expanded(
+                    child: _BottomNavItem(
+                      icon: modules[index].icon,
+                      label: modules[index].label,
+                      selected: index == selectedIndex,
+                      onTap: () => setState(() => _currentIndex = index),
+                    ),
+                  ),
+                if (needsOverflow)
+                  Expanded(
+                    child: _BottomNavItem(
+                      icon: Icons.more_horiz,
+                      label: '更多',
+                      selected: overflowSelected,
+                      onTap: () => _showMoreModulesSheet(
+                        modules: modules,
+                        overflowIndices: overflowIndices,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
+  }
+
+  Future<void> _showMoreModulesSheet({
+    required List<NavModule> modules,
+    required List<int> overflowIndices,
+  }) async {
+    final selected = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.xl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('更多模块', style: context.h3),
+              const SizedBox(height: AppSpacing.md),
+              for (final index in overflowIndices)
+                AppListTile(
+                  leading: Icon(modules[index].icon, size: 22),
+                  title: modules[index].label,
+                  trailing: index == _currentIndex
+                      ? Icon(
+                          Icons.check,
+                          size: 18,
+                          color: Theme.of(ctx).colorScheme.primary,
+                        )
+                      : null,
+                  onTap: () => Navigator.pop(ctx, index),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() => _currentIndex = selected);
+    }
   }
 
   Future<void> _runSync(String moduleId, Future<void>? Function() sync) async {
@@ -568,6 +688,47 @@ class _HomeScreenState extends State<HomeScreen> {
       final folderService = context.read<LocalFolderService>();
       await folderService.deleteFolder(folder.localId);
     }
+  }
+}
+
+class _BottomNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _BottomNavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.small.copyWith(
+              color: color,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

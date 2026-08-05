@@ -85,39 +85,72 @@ class HealthScreenState extends State<HealthScreen> {
         onRefresh: _load,
         child: LayoutBuilder(
           builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 640;
             final compact = constraints.maxWidth < 860;
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(AppSpacing.xl),
+              padding: EdgeInsets.fromLTRB(
+                narrow ? AppSpacing.lg : AppSpacing.xl,
+                narrow ? AppSpacing.lg : AppSpacing.xl,
+                narrow ? AppSpacing.lg : AppSpacing.xl,
+                narrow ? 96 : AppSpacing.xl,
+              ),
               children: [
-                _buildDateNavigator(),
-                const SizedBox(height: AppSpacing.lg),
-                _buildHero(entry, calories, isDark),
-                const SizedBox(height: AppSpacing.xl),
+                _buildDateNavigator(narrow: narrow),
+                SizedBox(height: narrow ? AppSpacing.md : AppSpacing.lg),
+                _buildHero(entry, calories, isDark, narrow: narrow),
+                SizedBox(height: narrow ? AppSpacing.lg : AppSpacing.xl),
                 if (compact) ...[
                   _buildTodayPanel(
-                      entry, calories, protein, carbs, fat, surface, border),
-                  const SizedBox(height: AppSpacing.lg),
-                  _buildInsightPanel(entry, meals, surface, border),
+                    entry,
+                    calories,
+                    protein,
+                    carbs,
+                    fat,
+                    surface,
+                    border,
+                    narrow: narrow,
+                  ),
+                  SizedBox(height: narrow ? AppSpacing.md : AppSpacing.lg),
+                  _buildInsightPanel(
+                    entry,
+                    meals,
+                    surface,
+                    border,
+                    narrow: narrow,
+                  ),
                 ] else
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         flex: 7,
-                        child: _buildTodayPanel(entry, calories, protein, carbs,
-                            fat, surface, border),
+                        child: _buildTodayPanel(
+                          entry,
+                          calories,
+                          protein,
+                          carbs,
+                          fat,
+                          surface,
+                          border,
+                          narrow: false,
+                        ),
                       ),
                       const SizedBox(width: AppSpacing.lg),
                       Expanded(
                         flex: 5,
-                        child:
-                            _buildInsightPanel(entry, meals, surface, border),
+                        child: _buildInsightPanel(
+                          entry,
+                          meals,
+                          surface,
+                          border,
+                          narrow: false,
+                        ),
                       ),
                     ],
                   ),
-                const SizedBox(height: AppSpacing.lg),
-                _buildMealsSection(meals, surface, border),
+                SizedBox(height: narrow ? AppSpacing.md : AppSpacing.lg),
+                _buildMealsSection(meals, surface, border, narrow: narrow),
               ],
             );
           },
@@ -126,11 +159,13 @@ class HealthScreenState extends State<HealthScreen> {
     );
   }
 
-  Widget _buildDateNavigator() {
+  Widget _buildDateNavigator({required bool narrow}) {
     final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
     final label = isToday
         ? '今天'
-        : '${_selectedDate.year}年${_selectedDate.month}月${_selectedDate.day}日';
+        : narrow
+            ? '${_selectedDate.month}月${_selectedDate.day}日'
+            : '${_selectedDate.year}年${_selectedDate.month}月${_selectedDate.day}日';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -148,6 +183,7 @@ class HealthScreenState extends State<HealthScreen> {
                 label: label,
                 icon: Icons.calendar_today_outlined,
                 width: null,
+                height: narrow ? 44 : null,
                 onPressed: _selectDate,
               ),
             ),
@@ -184,12 +220,52 @@ class HealthScreenState extends State<HealthScreen> {
     }
   }
 
-  Widget _buildHero(HealthEntry? entry, double calories, bool isDark) {
+  Widget _buildHero(
+    HealthEntry? entry,
+    double calories,
+    bool isDark, {
+    required bool narrow,
+  }) {
     final dayLabel = DateUtils.isSameDay(_selectedDate, DateTime.now())
         ? '今日'
         : '${_selectedDate.month}月${_selectedDate.day}日';
+    final weightMetric = _HeroMetric(
+      label: '体重',
+      value: entry?.weightKg == null
+          ? '--'
+          : '${entry!.weightKg!.toStringAsFixed(1)}kg',
+      expand: narrow,
+    );
+    final calorieMetric = _HeroMetric(
+      label: '摄入',
+      value: '${calories.round()}kcal',
+      expand: narrow,
+    );
+    final title = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Health Studio',
+          style: AppTypography.smallMediumLight(color: Colors.white70),
+        ),
+        SizedBox(height: narrow ? AppSpacing.xs : AppSpacing.sm),
+        Text(
+          narrow ? '$dayLabel健康记录' : '$dayLabel身体与饮食记录',
+          style: narrow
+              ? AppTypography.h2Light(color: Colors.white)
+              : AppTypography.h1Light(color: Colors.white),
+        ),
+        SizedBox(height: narrow ? AppSpacing.xs : AppSpacing.sm),
+        Text(
+          narrow
+              ? '体重、照片与饮食，形成可追踪的日报。'
+              : '记录体重、身体照片和每餐摄入，形成可追踪的健康日报。',
+          style: AppTypography.captionLight(color: Colors.white70),
+        ),
+      ],
+    );
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: EdgeInsets.all(narrow ? AppSpacing.lg : AppSpacing.xl),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF111827), Color(0xFF4F46E5)],
@@ -199,36 +275,30 @@ class HealthScreenState extends State<HealthScreen> {
         borderRadius: BorderRadius.circular(AppRadius.xl),
         boxShadow: isDark ? AppShadows.dark : AppShadows.medium,
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
+      child: narrow
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Health Studio',
-                    style:
-                        AppTypography.smallMediumLight(color: Colors.white70)),
-                const SizedBox(height: AppSpacing.sm),
-                Text('$dayLabel身体与饮食记录',
-                    style: AppTypography.h1Light(color: Colors.white)),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  '记录体重、身体照片和每餐摄入，形成可追踪的健康日报。',
-                  style: AppTypography.captionLight(color: Colors.white70),
+                title,
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Expanded(child: weightMetric),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(child: calorieMetric),
+                  ],
                 ),
               ],
+            )
+          : Row(
+              children: [
+                Expanded(child: title),
+                const SizedBox(width: AppSpacing.lg),
+                weightMetric,
+                const SizedBox(width: AppSpacing.md),
+                calorieMetric,
+              ],
             ),
-          ),
-          const SizedBox(width: AppSpacing.lg),
-          _HeroMetric(
-              label: '体重',
-              value: entry?.weightKg == null
-                  ? '--'
-                  : '${entry!.weightKg!.toStringAsFixed(1)}kg'),
-          const SizedBox(width: AppSpacing.md),
-          _HeroMetric(label: '摄入', value: '${calories.round()}kcal'),
-        ],
-      ),
     );
   }
 
@@ -239,14 +309,16 @@ class HealthScreenState extends State<HealthScreen> {
     double carbs,
     double fat,
     Color surface,
-    Color border,
-  ) {
+    Color border, {
+    required bool narrow,
+  }) {
     return _SectionCard(
       title: DateUtils.isSameDay(_selectedDate, DateTime.now())
           ? '今日概览'
           : '${_selectedDate.month}月${_selectedDate.day}日概览',
+      compact: narrow,
       action: AppButton.secondary(
-        label: '记录体重',
+        label: narrow ? '记体重' : '记录体重',
         icon: Icons.monitor_weight_outlined,
         height: 40,
         width: null,
@@ -259,93 +331,175 @@ class HealthScreenState extends State<HealthScreen> {
             children: [
               Expanded(
                 child: _MetricCard(
-                  label: '当前体重',
+                  label: narrow ? '体重' : '当前体重',
                   value: entry?.weightKg == null
                       ? '--'
                       : entry!.weightKg!.toStringAsFixed(1),
                   unit: 'kg',
                   icon: Icons.scale_outlined,
                   color: const Color(0xFF6366F1),
+                  compact: narrow,
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
+              SizedBox(width: narrow ? AppSpacing.sm : AppSpacing.md),
               Expanded(
                 child: _MetricCard(
-                  label: '估算体脂',
+                  label: narrow ? '体脂' : '估算体脂',
                   value: entry?.estimatedBodyFatPercent == null
                       ? '--'
                       : entry!.estimatedBodyFatPercent!.toStringAsFixed(1),
                   unit: '%',
                   icon: Icons.accessibility_new_outlined,
                   color: const Color(0xFF06B6D4),
+                  compact: narrow,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                  child: _MacroTile(
-                      label: '热量',
-                      value: calories.round(),
-                      unit: 'kcal',
-                      color: AppColors.warning)),
-              Expanded(
-                  child: _MacroTile(
-                      label: '蛋白质',
-                      value: protein.round(),
-                      unit: 'g',
-                      color: AppColors.success)),
-              Expanded(
-                  child: _MacroTile(
-                      label: '碳水',
-                      value: carbs.round(),
-                      unit: 'g',
-                      color: const Color(0xFF3B82F6))),
-              Expanded(
-                  child: _MacroTile(
-                      label: '脂肪',
-                      value: fat.round(),
-                      unit: 'g',
-                      color: const Color(0xFFEF4444))),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  label: '上传身体照片',
-                  icon: Icons.photo_camera_outlined,
-                  onPressed: _pickBodyPhoto,
+          SizedBox(height: narrow ? AppSpacing.sm : AppSpacing.md),
+          if (narrow)
+            Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MacroTile(
+                        label: '热量',
+                        value: calories.round(),
+                        unit: 'kcal',
+                        color: AppColors.warning,
+                        compact: true,
+                      ),
+                    ),
+                    Expanded(
+                      child: _MacroTile(
+                        label: '蛋白质',
+                        value: protein.round(),
+                        unit: 'g',
+                        color: AppColors.success,
+                        compact: true,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: AppButton.secondary(
-                  label: '添加饮食',
-                  icon: Icons.restaurant_menu_outlined,
-                  onPressed: _showMealSheet,
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MacroTile(
+                        label: '碳水',
+                        value: carbs.round(),
+                        unit: 'g',
+                        color: const Color(0xFF3B82F6),
+                        compact: true,
+                      ),
+                    ),
+                    Expanded(
+                      child: _MacroTile(
+                        label: '脂肪',
+                        value: fat.round(),
+                        unit: 'g',
+                        color: const Color(0xFFEF4444),
+                        compact: true,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: _MacroTile(
+                    label: '热量',
+                    value: calories.round(),
+                    unit: 'kcal',
+                    color: AppColors.warning,
+                  ),
+                ),
+                Expanded(
+                  child: _MacroTile(
+                    label: '蛋白质',
+                    value: protein.round(),
+                    unit: 'g',
+                    color: AppColors.success,
+                  ),
+                ),
+                Expanded(
+                  child: _MacroTile(
+                    label: '碳水',
+                    value: carbs.round(),
+                    unit: 'g',
+                    color: const Color(0xFF3B82F6),
+                  ),
+                ),
+                Expanded(
+                  child: _MacroTile(
+                    label: '脂肪',
+                    value: fat.round(),
+                    unit: 'g',
+                    color: const Color(0xFFEF4444),
+                  ),
+                ),
+              ],
+            ),
+          SizedBox(height: narrow ? AppSpacing.md : AppSpacing.lg),
+          if (narrow) ...[
+            AppButton(
+              label: '上传身体照片',
+              icon: Icons.photo_camera_outlined,
+              height: 48,
+              onPressed: _pickBodyPhoto,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AppButton.secondary(
+              label: '添加饮食',
+              icon: Icons.restaurant_menu_outlined,
+              height: 48,
+              onPressed: _showMealSheet,
+            ),
+          ] else
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    label: '上传身体照片',
+                    icon: Icons.photo_camera_outlined,
+                    onPressed: _pickBodyPhoto,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: AppButton.secondary(
+                    label: '添加饮食',
+                    icon: Icons.restaurant_menu_outlined,
+                    onPressed: _showMealSheet,
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
   }
 
   Widget _buildInsightPanel(
-      HealthEntry? entry, List<MealEntry> meals, Color surface, Color border) {
+    HealthEntry? entry,
+    List<MealEntry> meals,
+    Color surface,
+    Color border, {
+    required bool narrow,
+  }) {
     final photoPath = entry?.bodyPhotoPath;
     return _SectionCard(
-      title: '粗略估算与照片',
+      title: narrow ? '估算与照片' : '粗略估算与照片',
+      compact: narrow,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AspectRatio(
-            aspectRatio: 16 / 10,
+            aspectRatio: narrow ? 16 / 11 : 16 / 10,
             child: Container(
               decoration: BoxDecoration(
                 color: Theme.of(context)
@@ -358,33 +512,46 @@ class HealthScreenState extends State<HealthScreen> {
               clipBehavior: Clip.antiAlias,
               child: photoPath == null
                   ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.add_a_photo_outlined,
-                              size: 36,
-                              color: Theme.of(context).colorScheme.primary),
-                          const SizedBox(height: AppSpacing.sm),
-                          Text('添加身体照片并结合体重生成粗略估算',
-                              style: context.captionMedium),
-                        ],
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.add_a_photo_outlined,
+                              size: narrow ? 28 : 36,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              narrow ? '添加身体照片生成粗略估算' : '添加身体照片并结合体重生成粗略估算',
+                              style: context.captionMedium,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
                       ),
                     )
                   : _LocalImage(path: photoPath),
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
+          SizedBox(height: narrow ? AppSpacing.md : AppSpacing.lg),
           _InsightRow(
             icon: Icons.auto_awesome_outlined,
-            title: '体脂率粗略估算',
-            body: entry?.bodyAnalysisNote ?? '记录体重后生成粗略趋势，仅供日常参考，不构成医疗建议。',
+            title: narrow ? '体脂估算' : '体脂率粗略估算',
+            body: entry?.bodyAnalysisNote ??
+                (narrow
+                    ? '记录体重后生成粗略趋势，仅供日常参考。'
+                    : '记录体重后生成粗略趋势，仅供日常参考，不构成医疗建议。'),
           ),
           const SizedBox(height: AppSpacing.md),
           _InsightRow(
             icon: Icons.local_fire_department_outlined,
             title: '热量估算',
             body: meals.isEmpty
-                ? '添加饮食或餐食照片后，会自动形成每日热量与三大营养素摘要。'
+                ? (narrow
+                    ? '添加饮食后自动汇总热量与营养素。'
+                    : '添加饮食或餐食照片后，会自动形成每日热量与三大营养素摘要。')
                 : '今日已记录 ${meals.length} 餐，建议晚间复盘实际份量并微调估算值。',
           ),
         ],
@@ -393,13 +560,18 @@ class HealthScreenState extends State<HealthScreen> {
   }
 
   Widget _buildMealsSection(
-      List<MealEntry> meals, Color surface, Color border) {
+    List<MealEntry> meals,
+    Color surface,
+    Color border, {
+    required bool narrow,
+  }) {
     return _SectionCard(
       title: DateUtils.isSameDay(_selectedDate, DateTime.now())
           ? '今日饮食'
           : '${_selectedDate.month}月${_selectedDate.day}日饮食',
+      compact: narrow,
       action: AppButton.secondary(
-        label: '添加饮食',
+        label: narrow ? '添加' : '添加饮食',
         icon: Icons.add,
         height: 40,
         width: null,
@@ -410,11 +582,13 @@ class HealthScreenState extends State<HealthScreen> {
           ? AppEmptyState(
               icon: Icons.restaurant_outlined,
               title: '还没有饮食记录',
-              subtitle: '添加早餐、午餐、晚餐或加餐，系统会汇总热量。',
+              subtitle: narrow
+                  ? '添加早餐、午餐、晚餐或加餐。'
+                  : '添加早餐、午餐、晚餐或加餐，系统会汇总热量。',
               action: AppButton(
                 label: '添加第一餐',
                 icon: Icons.add,
-                width: 180,
+                width: narrow ? double.infinity : 180,
                 onPressed: _showMealSheet,
               ),
             )
@@ -685,25 +859,46 @@ class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
   final Widget? action;
+  final bool compact;
 
-  const _SectionCard({required this.title, required this.child, this.action});
+  const _SectionCard({
+    required this.title,
+    required this.child,
+    this.action,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: EdgeInsets.all(compact ? AppSpacing.lg : AppSpacing.xl),
       shadows: isDark ? AppShadows.dark : AppShadows.light,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(child: Text(title, style: context.h3)),
-              if (action != null) action!,
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
+          if (compact && action != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: context.bodyMedium),
+                const SizedBox(height: AppSpacing.sm),
+                SizedBox(width: double.infinity, child: action!),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: compact ? context.bodyMedium : context.h3,
+                  ),
+                ),
+                if (action != null) action!,
+              ],
+            ),
+          SizedBox(height: compact ? AppSpacing.md : AppSpacing.lg),
           child,
         ],
       ),
@@ -714,14 +909,19 @@ class _SectionCard extends StatelessWidget {
 class _HeroMetric extends StatelessWidget {
   final String label;
   final String value;
+  final bool expand;
 
-  const _HeroMetric({required this.label, required this.value});
+  const _HeroMetric({
+    required this.label,
+    required this.value,
+    this.expand = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 118,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      width: expand ? double.infinity : 118,
+      padding: EdgeInsets.all(expand ? AppSpacing.sm + 2 : AppSpacing.md),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -730,10 +930,19 @@ class _HeroMetric extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: AppTypography.smallMediumLight(color: Colors.white70)),
+          Text(
+            label,
+            style: AppTypography.smallMediumLight(color: Colors.white70),
+          ),
           const SizedBox(height: AppSpacing.xs),
-          Text(value, style: AppTypography.h3Light(color: Colors.white)),
+          Text(
+            value,
+            style: expand
+                ? AppTypography.bodyMediumLight(color: Colors.white)
+                : AppTypography.h3Light(color: Colors.white),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
@@ -746,18 +955,21 @@ class _MetricCard extends StatelessWidget {
   final String unit;
   final IconData icon;
   final Color color;
+  final bool compact;
 
-  const _MetricCard(
-      {required this.label,
-      required this.value,
-      required this.unit,
-      required this.icon,
-      required this.color});
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.icon,
+    required this.color,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: EdgeInsets.all(compact ? AppSpacing.md : AppSpacing.lg),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -765,14 +977,21 @@ class _MetricCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color),
-          const SizedBox(height: AppSpacing.md),
+          Icon(icon, color: color, size: compact ? 20 : 24),
+          SizedBox(height: compact ? AppSpacing.sm : AppSpacing.md),
           Text(label, style: context.smallMedium),
           const SizedBox(height: AppSpacing.xs),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(value, style: context.h1),
+              Flexible(
+                child: Text(
+                  value,
+                  style: compact ? context.h2 : context.h1,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               const SizedBox(width: AppSpacing.xs),
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
@@ -791,27 +1010,41 @@ class _MacroTile extends StatelessWidget {
   final int value;
   final String unit;
   final Color color;
+  final bool compact;
 
-  const _MacroTile(
-      {required this.label,
-      required this.value,
-      required this.unit,
-      required this.color});
+  const _MacroTile({
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.color,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-            width: 28,
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: compact ? AppSpacing.xs : 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: compact ? 20 : 28,
             height: 4,
             decoration: BoxDecoration(
-                color: color, borderRadius: BorderRadius.circular(2))),
-        const SizedBox(height: AppSpacing.sm),
-        Text(label, style: context.smallMedium),
-        Text('$value$unit', style: context.bodyMedium),
-      ],
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          SizedBox(height: compact ? AppSpacing.xs : AppSpacing.sm),
+          Text(label, style: compact ? context.small : context.smallMedium),
+          Text(
+            '$value$unit',
+            style: compact ? context.captionMedium : context.bodyMedium,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -889,8 +1122,11 @@ class _MealTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                    '${meal.estimatedCalories.round()} kcal · P ${meal.proteinG.round()}g / C ${meal.carbsG.round()}g / F ${meal.fatG.round()}g',
-                    style: context.caption),
+                  '${meal.estimatedCalories.round()} kcal · P${meal.proteinG.round()} C${meal.carbsG.round()} F${meal.fatG.round()}',
+                  style: context.caption,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),

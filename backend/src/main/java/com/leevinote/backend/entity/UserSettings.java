@@ -21,9 +21,10 @@ public class UserSettings extends BaseEntity {
     private String themeColor = "#2196F3";
 
     @Column(name = "module_order", length = 500)
-    private String moduleOrder = "notes,alarms,music,videos,schedules,transactions,health,profile";
+    private String moduleOrder =
+            "notes,alarms,music,videos,schedules,transactions,health,passwords,profile";
 
     @Column(name = "module_visibility", length = 1000)
     private String moduleVisibility =
-            "notes:true,alarms:true,music:true,videos:true,schedules:true,transactions:true,health:true,profile:true";
+            "notes:true,alarms:true,music:true,videos:true,schedules:true,transactions:true,health:true,passwords:true,profile:true";
 }

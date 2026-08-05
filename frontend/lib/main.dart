@@ -25,6 +25,7 @@ import 'package:leevinote/services/local_music_service.dart';
 import 'package:leevinote/services/local_video_service.dart';
 import 'package:leevinote/services/local_schedule_service.dart';
 import 'package:leevinote/services/local_health_service.dart';
+import 'package:leevinote/services/password_vault_service.dart';
 import 'package:leevinote/services/video_service.dart';
 import 'package:leevinote/services/local_transaction_service.dart';
 import 'package:leevinote/services/local_transaction_category_service.dart';
@@ -171,6 +172,7 @@ class LeevinoteApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LocalScheduleService()),
         ChangeNotifierProvider(create: (_) => LocalTransactionService()),
         ChangeNotifierProvider(create: (_) => LocalHealthService()),
+        ChangeNotifierProvider(create: (_) => PasswordVaultService()),
         ChangeNotifierProvider(
             create: (_) => LocalTransactionCategoryService()),
         ChangeNotifierProvider(create: (_) => HolidayService()),
