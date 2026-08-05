@@ -2,12 +2,16 @@ package com.leevinote.backend.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 
 @Slf4j
@@ -19,8 +23,26 @@ public class JwtTokenProvider {
     @Value("${jwt.expiration}")
     private int jwtExpirationMs;
 
+    private Key signingKey;
+
+    @PostConstruct
+    void initSigningKey() {
+        byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        // HS256 requires >= 256 bits. Derive a stable 256-bit key when the
+        // configured secret is shorter, so login does not fail at token issue.
+        if (keyBytes.length < 32) {
+            try {
+                keyBytes = MessageDigest.getInstance("SHA-256").digest(keyBytes);
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException("SHA-256 unavailable", e);
+            }
+            log.warn("jwt.secret is shorter than 32 bytes; derived SHA-256 key for HS256");
+        }
+        signingKey = Keys.hmacShaKeyFor(keyBytes);
+    }
+
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        return signingKey;
     }
 
     public String generateToken(Authentication authentication) {
@@ -30,7 +52,7 @@ public class JwtTokenProvider {
                 .claim("userId", userPrincipal.getId())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs * 1000L))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 

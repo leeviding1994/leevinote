@@ -24,7 +24,8 @@
    ```
 
 2. **配置后端地址**
-   使用 `--dart-define=API_BASE_URL=...`，无需修改源码。
+   - 默认：`http://backend.leevinote.leeviding.cn/api`
+   - 可用 `--dart-define=API_BASE_URL=...` 覆盖
 
 ### 运行项目
 
@@ -34,22 +35,16 @@ cd frontend
 # 获取依赖
 flutter pub get
 
-# 运行在Chrome（Web）
-flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080/api
+# 默认连线上 HTTP API
+flutter run -d linux
 
-# 运行在Android
-flutter run -d android
-
-# 运行在iOS
-flutter run -d ios
-
-# 运行在Windows
-flutter run -d windows
-
-# 运行在Linux
+# 指定其他后端地址
 flutter run -d linux --dart-define=API_BASE_URL=http://localhost:8080/api
 
-# 运行在Mac
+# 其他平台
+flutter run -d chrome
+flutter run -d android
+flutter run -d windows
 flutter run -d macos
 ```
 

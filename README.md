@@ -28,7 +28,8 @@ API 地址为 `http://localhost:8080/api`。
 ```bash
 cd frontend
 flutter pub get
-flutter run -d linux --dart-define=API_BASE_URL=http://localhost:8080/api
+# 默认 API：http://backend.leevinote.leeviding.cn/api
+flutter run -d linux
 ```
 
 ## 数据与同步边界

@@ -59,6 +59,10 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   static const _editorFontSize = 16.0;
   static const _editorLineHeight = 1.7;
+  // Keep left/right gutters equal so content stays centered; reserve room for
+  // the hover outline on the right without shifting text.
+  static const _documentSidePadding = 48.0;
+  static const _documentSidePaddingCompact = 24.0;
 
   late final NoteEditorArgs _args;
   late final QuillController _quillController;
@@ -66,6 +70,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   final _focusNode = FocusNode();
   final _editorScrollController = ScrollController();
   bool _showOutline = false;
+  Timer? _outlineCollapseTimer;
   int _outlineJumpSerial = 0;
 
   @override
@@ -82,10 +87,24 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   @override
   void dispose() {
+    _outlineCollapseTimer?.cancel();
     _quillController.removeListener(_onQuillSelectionChanged);
     _focusNode.dispose();
     _editorScrollController.dispose();
     super.dispose();
+  }
+
+  void _setOutlineExpanded(bool expanded) {
+    _outlineCollapseTimer?.cancel();
+    if (expanded) {
+      if (!_showOutline) setState(() => _showOutline = true);
+      return;
+    }
+    _outlineCollapseTimer = Timer(const Duration(milliseconds: 160), () {
+      if (mounted && _showOutline) {
+        setState(() => _showOutline = false);
+      }
+    });
   }
 
   void _onQuillSelectionChanged() {
@@ -591,9 +610,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        isCompact ? 56 : 40,
+        isCompact ? _documentSidePaddingCompact : _documentSidePadding,
         isCompact ? AppSpacing.xl : 40,
-        isCompact ? AppSpacing.lg : 40,
+        isCompact ? _documentSidePaddingCompact : _documentSidePadding,
         AppSpacing.lg,
       ),
       child: Column(
@@ -1296,9 +1315,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           onKeyPressed: (event, node) =>
               _handleEditorKeyPressed(event, editorState.quillController),
           padding: EdgeInsets.fromLTRB(
-            isCompact ? 56 : 40,
+            isCompact ? _documentSidePaddingCompact : _documentSidePadding,
             AppSpacing.sm,
-            isCompact ? AppSpacing.lg : 40,
+            isCompact ? _documentSidePaddingCompact : _documentSidePadding,
             96,
           ),
           customStyles: DefaultStyles(
@@ -1402,165 +1421,153 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
-  Widget _buildOutlineContent({
-    required bool isDark,
-    required NoteEditorState editorState,
-  }) {
-    final outlineItems = _outlineItems(editorState.quillController);
-    final secondaryColor =
-        isDark ? AppColors.secondaryTextDark : AppColors.secondaryText;
-    final activeOffset = editorState.quillController.selection.baseOffset;
-
-    int activeIndex = -1;
+  int _activeOutlineIndex(List<_OutlineItem> outlineItems, int activeOffset) {
+    var activeIndex = -1;
     for (var i = 0; i < outlineItems.length; i++) {
       if (outlineItems[i].offset <= activeOffset) activeIndex = i;
     }
+    return activeIndex;
+  }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.sm,
-          ),
-          child: Row(
+  Widget _buildCollapsedOutlineBars({
+    required List<_OutlineItem> outlineItems,
+    required int activeIndex,
+    required bool isDark,
+  }) {
+    final idleColor =
+        isDark ? const Color(0xFF666666) : const Color(0xFFD0D0D0);
+    final activeColor =
+        isDark ? AppColors.primaryTextDark : AppColors.primaryText;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 360),
+        child: SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.toc, size: 18, color: secondaryColor),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                '大纲',
-                style: AppTypography.captionMediumLight(color: secondaryColor),
-              ),
+              for (var i = 0; i < outlineItems.length; i++) ...[
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: switch (outlineItems[i].level) {
+                    1 => 14.0,
+                    2 => 11.0,
+                    _ => 8.0,
+                  },
+                  height: 2,
+                  decoration: BoxDecoration(
+                    color: i == activeIndex ? activeColor : idleColor,
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+                if (i < outlineItems.length - 1) const SizedBox(height: 7),
+              ],
             ],
           ),
         ),
-        const Divider(height: 1),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            itemCount: outlineItems.length,
-            itemBuilder: (context, index) {
-              final item = outlineItems[index];
-              final isActive = index == activeIndex;
-              final color = isActive
-                  ? Theme.of(context).colorScheme.primary
-                  : secondaryColor;
-              return InkWell(
-                onTap: () {
-                  _jumpToOutlineItem(item, editorState.quillController);
-                  setState(() => _showOutline = false);
-                },
-                child: Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: 2,
-                  ),
-                  padding: EdgeInsets.fromLTRB(
-                    AppSpacing.sm + (item.level - 1) * AppSpacing.md,
-                    AppSpacing.sm,
-                    AppSpacing.sm,
-                    AppSpacing.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: isDark ? 0.18 : 0.08)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
-                  child: Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.smallMediumLight(color: color),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildOutlinePane({
+  Widget _buildExpandedOutlineList({
+    required List<_OutlineItem> outlineItems,
+    required int activeIndex,
     required bool isDark,
     required NoteEditorState editorState,
   }) {
-    final outlineItems = _outlineItems(editorState.quillController);
-    if (outlineItems.isEmpty) return const SizedBox.shrink();
+    final secondaryColor =
+        isDark ? AppColors.secondaryTextDark : AppColors.secondaryText;
+    final primaryColor =
+        isDark ? AppColors.primaryTextDark : AppColors.primaryText;
 
-    final borderColor = isDark ? AppColors.borderDark : AppColors.border;
-    final surface = isDark ? AppColors.surfaceDark : AppColors.surface;
-
-    return Container(
-      width: 240,
-      margin: const EdgeInsets.fromLTRB(16, 20, 0, 24),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: borderColor),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.md,
+        horizontal: AppSpacing.sm,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: _buildOutlineContent(
-        isDark: isDark,
-        editorState: editorState,
-      ),
+      itemCount: outlineItems.length,
+      itemBuilder: (context, index) {
+        final item = outlineItems[index];
+        final isActive = index == activeIndex;
+        return InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          onTap: () => _jumpToOutlineItem(item, editorState.quillController),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.sm + (item.level - 1) * 12,
+              8,
+              AppSpacing.sm,
+              8,
+            ),
+            child: Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.smallMediumLight(
+                color: isActive ? primaryColor : secondaryColor,
+              ).copyWith(
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildCompactOutline({
+  Widget _buildHoverOutline({
     required bool isDark,
     required NoteEditorState editorState,
     required Widget child,
+    double bottomInset = 24,
   }) {
     final outlineItems = _outlineItems(editorState.quillController);
     if (outlineItems.isEmpty) return child;
 
-    final borderColor = isDark ? AppColors.borderDark : AppColors.border;
     final surface = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final secondaryColor =
-        isDark ? AppColors.secondaryTextDark : AppColors.secondaryText;
+    final activeOffset = editorState.quillController.selection.baseOffset;
+    final activeIndex = _activeOutlineIndex(outlineItems, activeOffset);
 
     return Stack(
       children: [
         child,
         Positioned(
-          left: AppSpacing.sm,
-          top: AppSpacing.sm,
-          bottom: 72,
+          right: 10,
+          top: 28,
+          bottom: bottomInset,
           child: MouseRegion(
-            onEnter: (_) => setState(() => _showOutline = true),
-            onExit: (_) => setState(() => _showOutline = false),
+            onEnter: (_) => _setOutlineExpanded(true),
+            onExit: (_) => _setOutlineExpanded(false),
             child: GestureDetector(
-              onTapDown: (_) => setState(() => _showOutline = true),
-              onLongPressStart: (_) => setState(() => _showOutline = true),
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _setOutlineExpanded(!_showOutline),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: _showOutline ? 236 : 34,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                width: _showOutline ? 228 : 18,
+                alignment: Alignment.centerRight,
                 decoration: BoxDecoration(
                   color: _showOutline
-                      ? surface
-                      : surface.withValues(alpha: isDark ? 0.78 : 0.86),
+                      ? surface.withValues(alpha: isDark ? 0.96 : 0.98)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(color: borderColor),
                   boxShadow: _showOutline
                       ? (isDark ? AppShadows.dark : AppShadows.medium)
                       : null,
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: _showOutline
-                    ? _buildOutlineContent(
+                    ? _buildExpandedOutlineList(
+                        outlineItems: outlineItems,
+                        activeIndex: activeIndex,
                         isDark: isDark,
                         editorState: editorState,
                       )
-                    : Center(
-                        child: Icon(Icons.toc, size: 18, color: secondaryColor),
+                    : _buildCollapsedOutlineBars(
+                        outlineItems: outlineItems,
+                        activeIndex: activeIndex,
+                        isDark: isDark,
                       ),
               ),
             ),
@@ -1624,44 +1631,39 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   ),
                   Expanded(
                     child: isCompact
-                        ? _buildCompactOutline(
+                        ? _buildHoverOutline(
                             isDark: isDark,
                             editorState: editorState,
+                            bottomInset: 72,
                             child: ColoredBox(color: surface, child: document),
                           )
-                        : Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildOutlinePane(
-                                isDark: isDark,
-                                editorState: editorState,
-                              ),
-                              Expanded(
-                                child: Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                                  child: Align(
-                                    alignment: Alignment.topCenter,
-                                    child: Container(
-                                      width: double.infinity,
-                                      constraints:
-                                          const BoxConstraints(maxWidth: 1080),
-                                      decoration: BoxDecoration(
-                                        color: surface,
-                                        borderRadius:
-                                            BorderRadius.circular(AppRadius.lg),
-                                        border: Border.all(color: border),
-                                        boxShadow: isDark
-                                            ? AppShadows.dark
-                                            : AppShadows.medium,
-                                      ),
-                                      clipBehavior: Clip.antiAlias,
-                                      child: document,
+                        : _buildHoverOutline(
+                            isDark: isDark,
+                            editorState: editorState,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 20, 16, 24),
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 1080),
+                                  child: Container(
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: surface,
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadius.lg),
+                                      border: Border.all(color: border),
+                                      boxShadow: isDark
+                                          ? AppShadows.dark
+                                          : AppShadows.medium,
                                     ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: document,
                                   ),
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                   ),
                   if (isCompact)

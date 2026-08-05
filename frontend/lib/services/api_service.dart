@@ -29,7 +29,8 @@ class ApiService {
         handler.next(options);
       },
       onError: (error, handler) async {
-        if (error.response?.statusCode == 401 || error.response?.statusCode == 403) {
+        if (error.response?.statusCode == 401 ||
+            error.response?.statusCode == 403) {
           final token = await _readToken();
           if (token != null) {
             await _deleteToken();
@@ -60,7 +61,8 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> post(String path, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> post(
+      String path, Map<String, dynamic> data) async {
     try {
       final response = await _dio.post(path, data: jsonEncode(data));
       return response.data;
@@ -98,7 +100,8 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> getPage(String path, {int page = 0, int size = 50}) async {
+  Future<Map<String, dynamic>> getPage(String path,
+      {int page = 0, int size = 50}) async {
     try {
       final separator = path.contains('?') ? '&' : '?';
       final response = await _dio.get('$path${separator}page=$page&size=$size');
@@ -132,7 +135,8 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> uploadBytes(String path, Uint8List bytes, String filename) async {
+  Future<Map<String, dynamic>> uploadBytes(
+      String path, Uint8List bytes, String filename) async {
     try {
       final formData = FormData.fromMap({
         'file': MultipartFile.fromBytes(bytes, filename: filename),
@@ -144,7 +148,8 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> put(String path, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> put(
+      String path, Map<String, dynamic> data) async {
     try {
       final response = await _dio.put(path, data: jsonEncode(data));
       return response.data;
@@ -162,9 +167,11 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> patch(String path, {Map<String, dynamic>? data}) async {
+  Future<Map<String, dynamic>> patch(String path,
+      {Map<String, dynamic>? data}) async {
     try {
-      final response = await _dio.patch(path, data: data != null ? jsonEncode(data) : null);
+      final response =
+          await _dio.patch(path, data: data != null ? jsonEncode(data) : null);
       return response.data;
     } on DioException catch (e) {
       throw _handleError(e);
@@ -191,8 +198,27 @@ class ApiService {
           return str;
         }
       }
-      return statusCode != null ? 'Request failed ($statusCode)' : 'Request failed';
+      return statusCode != null
+          ? 'Request failed ($statusCode)'
+          : 'Request failed';
     }
-    return e.message ?? 'Network error';
+
+    switch (e.type) {
+      case DioExceptionType.connectionError:
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return '无法连接服务器（${ApiConstants.baseUrl}），请确认后端已启动';
+      case DioExceptionType.badCertificate:
+        return '服务器证书校验失败（${ApiConstants.baseUrl}）';
+      default:
+        final message = e.message ?? '';
+        if (message.contains('CERTIFICATE') ||
+            message.contains('HandshakeException') ||
+            message.contains('SSL')) {
+          return '无法建立安全连接（${ApiConstants.baseUrl}）';
+        }
+        return message.isNotEmpty ? message : 'Network error';
+    }
   }
 }

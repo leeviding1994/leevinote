@@ -1,7 +1,7 @@
 class ApiConstants {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://backend.leevinote.leeviding.cn/api',
+    defaultValue: 'http://backend.leevinote.leeviding.cn/api',
   );
 
   static const String signup = '/auth/signup';

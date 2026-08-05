@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:leevinote/models/alarm.dart';
@@ -17,9 +19,14 @@ class AlarmService extends ChangeNotifier {
   bool _syncing = false;
   FlutterLocalNotificationsPlugin? _notificationsPlugin;
   bool _initialized = false;
+  final Map<String, Timer> _desktopTimers = {};
 
   AlarmService(this._api, this._local, {HolidayService? holidayService})
       : _holidayService = holidayService;
+
+  /// Linux has no OS-level scheduled notifications; fire while the app process
+  /// is alive via Dart timers + notification show().
+  bool get _usesInAppScheduler => defaultTargetPlatform == TargetPlatform.linux;
 
   void setHolidayService(HolidayService service) {
     _holidayService = service;
@@ -41,7 +48,8 @@ class AlarmService extends ChangeNotifier {
 
       _notificationsPlugin = FlutterLocalNotificationsPlugin();
 
-      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
@@ -66,7 +74,8 @@ class AlarmService extends ChangeNotifier {
                 AndroidFlutterLocalNotificationsPlugin>();
         if (androidPlugin != null) {
           // 1. 删除旧渠道并创建新渠道（Android 渠道一旦创建属性不可更改，必须换 ID）
-          await androidPlugin.deleteNotificationChannel(channelId: 'alarm_channel');
+          await androidPlugin.deleteNotificationChannel(
+              channelId: 'alarm_channel');
           const channel = AndroidNotificationChannel(
             'alarm_channel_v2',
             '闹钟提醒',
@@ -127,7 +136,8 @@ class AlarmService extends ChangeNotifier {
     try {
       final data = await _api.getList(ApiConstants.alarms);
       final remoteAlarms = data
-          .map((e) => Alarm.fromJson(e as Map<String, dynamic>).copyWith(syncStatus: 'synced'))
+          .map((e) => Alarm.fromJson(e as Map<String, dynamic>)
+              .copyWith(syncStatus: 'synced'))
           .toList();
       for (final ra in remoteAlarms) {
         await _local.addOrUpdateFromRemote(ra);
@@ -153,6 +163,12 @@ class AlarmService extends ChangeNotifier {
     return localAlarm;
   }
 
+  @override
+  void dispose() {
+    _cancelAllDesktopTimers();
+    super.dispose();
+  }
+
   Future<void> deleteAlarm(String localId) async {
     final alarm = _alarms.firstWhere(
       (a) => a.localId == localId,
@@ -160,6 +176,7 @@ class AlarmService extends ChangeNotifier {
     );
     // Always cancel the local notification
     if (_initialized) {
+      _cancelDesktopTimer(localId);
       await _notificationsPlugin?.cancel(id: _notificationId(alarm));
     }
     if (alarm.id != null) {
@@ -183,8 +200,12 @@ class AlarmService extends ChangeNotifier {
     if (index != -1) _alarms[index] = updated;
     notifyListeners();
     if (_initialized && updated.enabled) {
+      _cancelDesktopTimer(updated.localId);
       await _notificationsPlugin?.cancel(id: _notificationId(updated));
       await _scheduleNotification(updated);
+    } else if (_initialized && !updated.enabled) {
+      _cancelDesktopTimer(updated.localId);
+      await _notificationsPlugin?.cancel(id: _notificationId(updated));
     }
   }
 
@@ -201,6 +222,7 @@ class AlarmService extends ChangeNotifier {
       if (updated.enabled) {
         await _scheduleNotification(updated);
       } else {
+        _cancelDesktopTimer(updated.localId);
         await _notificationsPlugin?.cancel(id: _notificationId(updated));
       }
     }
@@ -218,7 +240,8 @@ class AlarmService extends ChangeNotifier {
             await _api.delete('${ApiConstants.alarms}/${alarm.id}');
             await _local.deleteAlarm(alarm.localId);
           } catch (_) {}
-        } else if (alarm.syncStatus == 'local' || alarm.syncStatus == 'modified') {
+        } else if (alarm.syncStatus == 'local' ||
+            alarm.syncStatus == 'modified') {
           try {
             final result = alarm.id == null
                 ? await _api.post(ApiConstants.alarms, alarm.toRemoteJson())
@@ -239,14 +262,20 @@ class AlarmService extends ChangeNotifier {
       }
 
       final remoteData = await _api.getList(ApiConstants.alarms);
-      final remoteIds = remoteData.map((e) => (e as Map)['id'] as int?).whereType<int>().toSet();
+      final remoteIds = remoteData
+          .map((e) => (e as Map)['id'] as int?)
+          .whereType<int>()
+          .toSet();
       for (final alarm in List.from(_local.alarms)) {
-        if (alarm.id != null && alarm.syncStatus == 'synced' && !remoteIds.contains(alarm.id)) {
+        if (alarm.id != null &&
+            alarm.syncStatus == 'synced' &&
+            !remoteIds.contains(alarm.id)) {
           await _local.deleteAlarm(alarm.localId);
         }
       }
       for (final e in remoteData) {
-        final remote = Alarm.fromJson(e as Map<String, dynamic>).copyWith(syncStatus: 'synced');
+        final remote = Alarm.fromJson(e as Map<String, dynamic>)
+            .copyWith(syncStatus: 'synced');
         await _local.addOrUpdateFromRemote(remote);
       }
 
@@ -282,16 +311,21 @@ class AlarmService extends ChangeNotifier {
       presentBadge: true,
       presentSound: true,
     );
+    const linuxDetails = LinuxNotificationDetails(
+      urgency: LinuxNotificationUrgency.critical,
+    );
     const details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
+      linux: linuxDetails,
     );
 
     // 计算下一个触发时间
     final nextDate = _calculateNextTriggerDate(alarm);
     if (nextDate == null) {
       debugPrint('闹钟 "${alarm.title}" 无法计算下一个触发时间，自动禁用');
-      final updated = alarm.copyWith(enabled: false, syncStatus: alarm.id != null ? 'modified' : 'local');
+      final updated = alarm.copyWith(
+          enabled: false, syncStatus: alarm.id != null ? 'modified' : 'local');
       await _local.updateAlarm(updated);
       final index = _alarms.indexWhere((a) => a.localId == alarm.localId);
       if (index != -1) _alarms[index] = updated;
@@ -301,13 +335,105 @@ class AlarmService extends ChangeNotifier {
 
     final now = tz.TZDateTime.now(tz.local);
     debugPrint('闹钟 "${alarm.title}" 下次触发: $nextDate, 当前时间: $now');
+
+    // Linux 原生通知 API 不支持 zonedSchedule，改用应用内 Timer。
+    if (_usesInAppScheduler) {
+      await _scheduleWithDesktopTimer(alarm, nextDate, details);
+      return;
+    }
+
     await _zonedScheduleWithFallback(alarm, nextDate, details);
+  }
+
+  Future<void> _scheduleWithDesktopTimer(
+    Alarm alarm,
+    tz.TZDateTime scheduledDate,
+    NotificationDetails details,
+  ) async {
+    _cancelDesktopTimer(alarm.localId);
+    final now = tz.TZDateTime.now(tz.local);
+    var delay = scheduledDate.difference(now);
+    if (delay.isNegative) {
+      delay = Duration.zero;
+    }
+
+    _desktopTimers[alarm.localId] = Timer(delay, () async {
+      _desktopTimers.remove(alarm.localId);
+      if (_notificationsPlugin == null) return;
+
+      Alarm? matched;
+      for (final item in _alarms) {
+        if (item.localId == alarm.localId) {
+          matched = item;
+          break;
+        }
+      }
+      if (matched == null || !matched.enabled) return;
+      final active = matched;
+
+      try {
+        await _notificationsPlugin!.show(
+          id: _notificationId(active),
+          title: active.title,
+          body: active.description ?? '闹钟提醒时间到了',
+          notificationDetails: details,
+        );
+        debugPrint('桌面闹钟 "${active.title}" 已触发通知');
+      } catch (e) {
+        debugPrint('桌面闹钟通知显示失败: $e');
+      }
+
+      final isOneShot =
+          active.repeatPattern == null || active.repeatPattern == '单次';
+      if (isOneShot) {
+        final disabled = active.copyWith(
+          enabled: false,
+          syncStatus: active.id != null ? 'modified' : 'local',
+        );
+        await _local.updateAlarm(disabled);
+        final index = _alarms.indexWhere((a) => a.localId == active.localId);
+        if (index != -1) _alarms[index] = disabled;
+        notifyListeners();
+        return;
+      }
+
+      // 重复闹钟：触发后安排下一次。
+      await Future<void>.delayed(const Duration(seconds: 1));
+      Alarm? latest;
+      for (final item in _alarms) {
+        if (item.localId == active.localId) {
+          latest = item;
+          break;
+        }
+      }
+      if (latest != null && latest.enabled) {
+        await _scheduleNotification(latest);
+      }
+    });
+
+    debugPrint(
+      '桌面闹钟 "${alarm.title}" 已用应用内定时器调度，'
+      '将在 ${delay.inSeconds} 秒后触发（应用需保持运行）',
+    );
+  }
+
+  void _cancelDesktopTimer(String localId) {
+    _desktopTimers.remove(localId)?.cancel();
+  }
+
+  void _cancelAllDesktopTimers() {
+    for (final timer in _desktopTimers.values) {
+      timer.cancel();
+    }
+    _desktopTimers.clear();
   }
 
   tz.TZDateTime? _calculateNextTriggerDate(Alarm alarm) {
     final now = tz.TZDateTime.now(tz.local);
     final baseTime = tz.TZDateTime.from(alarm.alarmTime, tz.local);
-    final today = tz.TZDateTime.from(DateTime(now.year, now.month, now.day, baseTime.hour, baseTime.minute), tz.local);
+    final today = tz.TZDateTime.from(
+        DateTime(now.year, now.month, now.day, baseTime.hour, baseTime.minute),
+        tz.local);
 
     switch (alarm.repeatPattern) {
       case '单次':
@@ -331,7 +457,8 @@ class AlarmService extends ChangeNotifier {
         // 工作日：周一到周五
         for (int i = 0; i <= 7; i++) {
           final date = today.add(Duration(days: i));
-          if (date.weekday >= DateTime.monday && date.weekday <= DateTime.friday) {
+          if (date.weekday >= DateTime.monday &&
+              date.weekday <= DateTime.friday) {
             if (date.isAfter(now) || (i == 0 && !today.isBefore(now))) {
               return date;
             }
